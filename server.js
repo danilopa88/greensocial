@@ -80,16 +80,16 @@ app.get('/api/volunteers', (req, res) => {
 });
 
 app.post('/api/volunteers', (req, res) => {
-    const { name, email, skills, status } = req.body;
-    db.run('INSERT INTO volunteers (name, email, skills, status) VALUES (?, ?, ?, ?)', [name, email, skills, status], function(err) {
+    const { name, email, skills, status, phone, birth_date } = req.body;
+    db.run('INSERT INTO volunteers (name, email, skills, status, phone, birth_date) VALUES (?, ?, ?, ?, ?, ?)', [name, email, skills, status, phone || null, birth_date || null], function(err) {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ id: this.lastID, name, email, skills, status });
+        res.json({ id: this.lastID, name, email, skills, status, phone, birth_date });
     });
 });
 
 app.put('/api/volunteers/:id', (req, res) => {
-    const { name, email, skills, status } = req.body;
-    db.run('UPDATE volunteers SET name=?, email=?, skills=?, status=? WHERE id=?', [name, email, skills, status, req.params.id], function(err) {
+    const { name, email, skills, status, phone, birth_date } = req.body;
+    db.run('UPDATE volunteers SET name=?, email=?, skills=?, status=?, phone=?, birth_date=? WHERE id=?', [name, email, skills, status, phone || null, birth_date || null, req.params.id], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
     });

@@ -17,6 +17,8 @@ Armazena as informações cadastrais de todos os membros e administradores.
 | `skills` | TEXT | Descrição das habilidades do membro. |
 | `status` | TEXT | Estado atual (Ativo/Inativo). |
 | `avatar_url` | TEXT | Caminho local para a imagem de perfil. |
+| `phone` | TEXT | Telefone no formato `XX-XXXXXXXX` ou `XX-XXXXXXXXX`. |
+| `birth_date` | TEXT | Data de nascimento no formato `DD/MM/AAAA`. |
 
 ---
 

@@ -19,12 +19,16 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 email TEXT UNIQUE NOT NULL,
                 skills TEXT,
                 status TEXT,
-                avatar_url TEXT
+                avatar_url TEXT,
+                phone TEXT,
+                birth_date TEXT
             )`, () => {
                 // Migração garantida para bancos existentes
                 db.all("PRAGMA table_info(volunteers)", (err, columns) => {
-                    if (!err && columns && !columns.some(c => c.name === 'avatar_url')) {
-                        db.run('ALTER TABLE volunteers ADD COLUMN avatar_url TEXT');
+                    if (!err && columns) {
+                        if (!columns.some(c => c.name === 'avatar_url')) db.run('ALTER TABLE volunteers ADD COLUMN avatar_url TEXT');
+                        if (!columns.some(c => c.name === 'phone'))      db.run('ALTER TABLE volunteers ADD COLUMN phone TEXT');
+                        if (!columns.some(c => c.name === 'birth_date')) db.run('ALTER TABLE volunteers ADD COLUMN birth_date TEXT');
                     }
                 });
             });
