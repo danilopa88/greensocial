@@ -765,6 +765,7 @@ body::before {
 
 .form-row .form-group {
     margin-bottom: 1.5rem;
+    min-width: 0; /* Evita overflow em grids */
 }
 
 .form-group label {
