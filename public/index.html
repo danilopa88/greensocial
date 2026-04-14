@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greensocial - Plataforma de Voluntários</title>
+    <meta name="description" content="Plataforma de engajamento e gestão para comunidades de voluntários.">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Cropper.js for Avatar Shaping -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+</head>
+
+<body>
+    <!-- Tela de Login -->
+    <div id="login-container" class="login-overlay active">
+        <div class="login-box">
+            <h2><i class="fa-solid fa-leaf"></i> Greensocial</h2>
+            <p>Faça login para entrar na rede.</p>
+            <form id="form-login">
+                <div class="form-group">
+                    <label>E-mail</label>
+                    <input type="email" id="login-email" required placeholder="email@exemplo.com">
+                </div>
+                <div class="form-group">
+                    <label>Senha</label>
+                    <input type="password" id="login-password" required placeholder="Use uma senha teste (como 1234)">
+                </div>
+                <p id="login-error" style="color: #ef4444; font-size: 0.85rem; display: none; margin-bottom: 1rem;">
+                    Email não encontrado.</p>
+                <button type="submit" class="btn-primary" style="width: 100%;">Entrar</button>
+            </form>
+            <p style="font-size: 0.8rem; color: #64748b; margin-top: 1rem; text-align: center;">Para acessar como
+                administrador, use: <br /><strong>admin@greensocial.org</strong></p>
+        </div>
+    </div>
+
+    <div id="app-container" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fa-solid fa-leaf"></i> Greensocial</h2>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#" data-target="feed" class="active"><i class="fa-solid fa-rss"></i> Feed Social</a></li>
+                <li><a href="#" data-target="admin"><i class="fa-solid fa-users-gear"></i> Gestão Admin</a></li>
+                <li><a href="#" data-target="profile"><i class="fa-solid fa-user"></i> Meu Perfil</a></li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://ui-avatars.com/api/?name=Admin+Voluntario&background=22c55e&color=fff"
+                        alt="User Avatar" class="avatar" id="current-user-avatar">
+                    <div class="user-details">
+                        <span class="user-name" id="current-user-name">Usuário</span>
+                        <a href="#" id="btn-logoff"
+                            style="color: #ef4444; font-weight: 500; font-size: 0.8rem; text-decoration: none; margin-top: 0.2rem;"><i
+                                class="fa-solid fa-right-from-bracket"></i> Sair</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- View: Feed -->
+            <section id="view-feed" class="view-section active">
+                <header class="section-header">
+                    <h1>Feed da Comunidade</h1>
+                    <p>Fique por dentro do que está acontecendo.</p>
+                </header>
+
+                <div class="new-post-box">
+                    <div style="display: flex; align-items: center; gap: 1.5rem; width: 100%;">
+                        <img src="https://ui-avatars.com/api/?name=Admin+Voluntario&background=22c55e&color=fff"
+                            alt="Avatar" class="avatar">
+                        <input type="text" id="new-post-input" placeholder="Compartilhe algo com a comunidade...">
+                    </div>
+
+                    <div id="media-preview-container"
+                        style="display: none; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem;">
+                        <!-- JS vai injetar divs com a classe preview-item -->
+                    </div>
+
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--card-border); padding-top: 1rem;">
+                        <input type="file" id="media-upload" accept="image/*,video/*" multiple hidden>
+                        <button id="btn-add-media" class="btn-secondary"><i class="fa-solid fa-image"></i> Foto /
+                            Vídeo</button>
+                        <button id="btn-publish" class="btn-primary">Publicar</button>
+                    </div>
+                </div>
+
+                <div id="posts-container" class="posts-list">
+                    <!-- Posts dynamically inserted here by JS -->
+                </div>
+            </section>
+
+            <!-- View: Gestão Admin -->
+            <section id="view-admin" class="view-section">
+                <header class="section-header flex-header">
+                    <div>
+                        <h1>Gestão de Voluntários</h1>
+                        <p>Administre quem faz parte da nossa rede.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button id="btn-export-excel" class="btn-secondary"
+                            style="border-color: #10b981; color: #10b981;"><i class="fa-solid fa-file-excel"></i>
+                            Exportar XLSX</button>
+                        <button id="btn-add-volunteer" class="btn-primary"><i class="fa-solid fa-plus"></i> Novo
+                            Voluntário</button>
+                    </div>
+                </header>
+
+                <div class="table-container">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>Nome Completo</th>
+                                <th>Email</th>
+                                <th>Habilidades</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="volunteers-table-body">
+                            <!-- Rows dynamically inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- View: Meu Perfil -->
+            <section id="view-profile" class="view-section">
+                <header class="section-header">
+                    <h1>Meu Perfil</h1>
+                    <p>Gerencie suas informações pessoais.</p>
+                </header>
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <div style="position: relative;">
+                            <img src="https://ui-avatars.com/api/?name=Admin+Voluntario&background=22c55e&color=fff"
+                                alt="Avatar" class="profile-avatar" id="my-profile-avatar">
+                            <label for="avatar-input" class="avatar-edit-badge" title="Mudar foto de perfil">
+                                <i class="fa-solid fa-camera"></i>
+                            </label>
+                            <input type="file" id="avatar-input" accept="image/*" hidden>
+                        </div>
+                        <div>
+                            <h2 class="profile-name" id="my-profile-name">Carregando...</h2>
+                            <p class="profile-bio" id="my-profile-bio">Seja bem-vindo(a) à plataforma!</p>
+                        </div>
+                    </div>
+                    <form class="profile-form">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="text" value="" disabled id="my-profile-email">
+                        </div>
+                        <div class="form-group">
+                            <label>Suas Habilidades</label>
+                            <input type="text" value="" disabled id="my-profile-skills">
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+
+        <!-- Modal para Adicionar/Editar Voluntário -->
+        <div id="modal-add-volunteer" class="modal-overlay">
+            <div class="modal-content">
+                <button class="modal-close" id="btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+                <h2 id="modal-title">Cadastrar Novo Voluntário</h2>
+                <form id="form-add-volunteer">
+                    <div class="form-group">
+                        <label for="vol-name">Nome Completo</label>
+                        <input type="text" id="vol-name" required placeholder="Ex: Maria Joaquina">
+                    </div>
+                    <div class="form-group">
+                        <label for="vol-email">E-mail</label>
+                        <input type="email" id="vol-email" required placeholder="maria@exemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="vol-skills">Habilidades (separadas por vírgula)</label>
+                        <input type="text" id="vol-skills" placeholder="Ex: Culinária, Música, Excel">
+                    </div>
+                    <div class="form-group">
+                        <label for="vol-status">Status</label>
+                        <select id="vol-status" class="premium-select">
+                            <option value="Ativo">Ativo</option>
+                            <option value="Inativo">Inativo</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem;">Salvar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Integrações Externas (Excel e DB) -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+    <!-- Cropper Modal -->
+    <div id="modal-crop-avatar" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px;">
+            <button class="modal-close" onclick="closeCropModal()">&times;</button>
+            <h2>Ajustar Foto</h2>
+            <div style="width: 100%; height: 350px; background: #eee; border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem;">
+                <img id="crop-image" style="max-width: 100%;">
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button class="btn-secondary" onclick="closeCropModal()">Cancelar</button>
+                <button class="btn-primary" onclick="confirmCrop()">Confirmar e Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
