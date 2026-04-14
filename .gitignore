@@ -1,0 +1,28 @@
+# Dependências
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Banco de Dados (Dados sensíveis/locais)
+database.sqlite
+database.sqlite-journal
+
+# Mídias e Backups (Arquivos pesados e privados)
+uploads/
+backups/
+
+# Binários e Build
+greensocial.exe
+dist/
+build/
+
+# IDE e Configurações de Sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Ambiente
+.env
+.env.local
