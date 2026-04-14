@@ -230,6 +230,10 @@ function loginAs(email, role, id) {
     document.getElementById('my-profile-bio').innerText = volBio;
     document.getElementById('my-profile-email').value = email;
     document.getElementById('my-profile-skills').value = volSkills;
+    const profilePhone = document.getElementById('my-profile-phone');
+    const profileBirth = document.getElementById('my-profile-birth-date');
+    if (profilePhone) profilePhone.value = (vol && vol.phone) ? vol.phone : '—';
+    if (profileBirth) profileBirth.value = (vol && vol.birth_date) ? vol.birth_date : '—';
     const profileAvatarEl = document.getElementById('my-profile-avatar');
     if (profileAvatarEl) {
         profileAvatarEl.src = getAvatarUrl(userNameStr, vol ? vol.avatar_url : null);
@@ -669,6 +673,8 @@ function renderVolunteers() {
                 </div>
             </td>
             <td>${escapeHTML(vol.email)}</td>
+            <td>${escapeHTML(vol.phone || '—')}</td>
+            <td>${escapeHTML(vol.birth_date || '—')}</td>
             <td class="skills-list">${escapeHTML(vol.skills)}</td>
             <td><span class="badge ${statusClass}">${escapeHTML(vol.status)}</span></td>
             <td>
