@@ -26,16 +26,34 @@
 
 ## 📦 Como Instalar e Rodar
 
-### Modo Desenvolvedor
-1.  **Pré-requisitos**: Tenha o [Node.js](https://nodejs.org/) instalado.
-2.  **Instale as dependências**:
+O projeto pode ser executado de duas formas: como desenvolvedor (usando Node.js) ou via executável pronto para Windows.
+
+### 💻 Modo Desenvolvedor (Para quem quer editar o código)
+
+1.  **Abra o Terminal na pasta do projeto**: No Windows, entre na pasta `App`, segure a tecla `Shift`, clique com o botão direito em um espaço vazio e escolha **"Abrir janela do PowerShell aqui"** ou **"Abrir no Terminal"**.
+2.  **Pré-requisitos**: Certifique-se de ter o [Node.js](https://nodejs.org/) instalado em seu computador.
+3.  **Instale as Dependências**: Digite o comando abaixo e aperte Enter. Isso criará a pasta `node_modules`.
     ```bash
     npm install
     ```
-3.  **Inicie o servidor**:
+4.  **Inicie o Servidor**: Escolha um dos comandos abaixo:
+    - **Para uso normal**: 
+      ```bash
+      npm start
+      ```
+    - **Para desenvolvimento** (O servidor reinicia sozinho ao salvar arquivos): 
+      ```bash
+      npm run dev
+      ```
+5.  **Acesse no Navegador**: Abra o endereço [http://localhost:3000](http://localhost:3000).
+
+### Como Gerar o Executável (Build)
+Se você precisar criar uma nova versão do arquivo `.exe`:
+1.  **Comando**:
     ```bash
-    npm start
+    npm run build
     ```
+2.  O arquivo `greensocial.exe` será gerado/atualizado na raiz do projeto.
 
 ### Modo Executável (Windows)
 Se você já possui o arquivo `greensocial.exe`, basta executá-lo. O sistema criará automaticamente as pastas de banco de dados e uploads necessárias.
@@ -57,6 +75,15 @@ O Greensocial foi construído com foco em integridade:
 ## 📄 Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+## 📁 Estrutura de Pastas e Git
+
+Para manter o repositório leve e seguro, as seguintes pastas são **ignoradas pelo Git** (não são enviadas para o GitHub):
+- `/uploads`: Contém todas as mídias (fotos de perfil e posts).
+- `/node_modules`: Dependências do projeto.
+- `/backups`: Cópias de segurança do banco de dados.
+- `database.sqlite`: O banco de dados local.
+- `greensocial.exe`: O arquivo executável.
 
 ---
 Desenvolvido com ❤️ para fortalecer comunidades de voluntários.
