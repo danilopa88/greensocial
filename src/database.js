@@ -32,13 +32,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
             // Posts (Agora ligada ao ID do autor)
             db.run(`CREATE TABLE IF NOT EXISTS posts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                author_id INTEGER NOT NULL,
+                author_id INTEGER,
                 time TEXT,
                 content TEXT,
                 likes INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE CASCADE
+                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE SET NULL
             )`, () => {
                 db.all("PRAGMA table_info(posts)", (err, columns) => {
                     if (!err && columns) {
@@ -61,12 +61,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
             db.run(`CREATE TABLE IF NOT EXISTS comments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 post_id INTEGER NOT NULL,
-                author_id INTEGER NOT NULL,
+                author_id INTEGER,
                 text TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
-                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE CASCADE
+                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE SET NULL
             )`, () => {
                 db.all("PRAGMA table_info(comments)", (err, columns) => {
                     if (!err && columns) {
@@ -102,6 +102,56 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 logoff_time TEXT,
                 FOREIGN KEY (volunteer_id) REFERENCES volunteers(id) ON DELETE CASCADE
             )`);
+
+            // Auditoria de Exclusões (Log de segurança)
+            db.run(`CREATE TABLE IF NOT EXISTS deletion_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                table_name TEXT NOT NULL,
+                record_id INTEGER NOT NULL,
+                deletion_date DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`);
+
+            // === MIGRAÇÃO: Mudar CASCADE para SET NULL em Posts e Comments ===
+            const migrateTable = (tableName, createSql) => {
+                db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name=?`, [tableName], (err, row) => {
+                    if (!err && row && row.sql.includes('ON DELETE CASCADE') && row.sql.includes('author_id')) {
+                        console.log(`Migrando tabela ${tableName} para suportar preservação de dados...`);
+                        db.serialize(() => {
+                            db.run(`PRAGMA foreign_keys = OFF`);
+                            db.run(`ALTER TABLE ${tableName} RENAME TO ${tableName}_old`);
+                            db.run(createSql);
+                            db.run(`INSERT INTO ${tableName} SELECT * FROM ${tableName}_old`);
+                            db.run(`DROP TABLE ${tableName}_old`);
+                            db.run(`PRAGMA foreign_keys = ON`);
+                        });
+                    }
+                });
+            };
+
+            const postsSql = `CREATE TABLE IF NOT EXISTS posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                author_id INTEGER,
+                time TEXT,
+                content TEXT,
+                likes INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE SET NULL
+            )`;
+
+            const commentsSql = `CREATE TABLE IF NOT EXISTS comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER NOT NULL,
+                author_id INTEGER,
+                text TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE SET NULL
+            )`;
+
+            migrateTable('posts', postsSql);
+            migrateTable('comments', commentsSql);
 
             // Seed inicial para não deixar o app vazio
             db.get(`SELECT COUNT(*) as count FROM volunteers`, (err, row) => {

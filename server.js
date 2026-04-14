@@ -123,9 +123,15 @@ app.post('/api/volunteers/:id/avatar', avatarUpload.single('avatar'), (req, res)
 });
 
 app.delete('/api/volunteers/:id', (req, res) => {
-    db.run('DELETE FROM volunteers WHERE id=?', req.params.id, function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
+    const id = req.params.id;
+    // Auditoria: Salvando ID antes da remoção
+    db.run('INSERT INTO deletion_audit (table_name, record_id) VALUES (?, ?)', ['volunteers', id], (err) => {
+        if (err) console.error('Erro ao auditar deleção:', err.message);
+        
+        db.run('DELETE FROM volunteers WHERE id=?', id, function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        });
     });
 });
 
@@ -135,10 +141,10 @@ app.get('/api/posts', (req, res) => {
     
     // PREVENÇÃO DE SQL INJECTION: Usando ? placeholder para o userId
     const postsQuery = `
-        SELECT p.*, v.name as author, v.email as author_email, v.avatar_url as author_avatar,
+        SELECT p.*, COALESCE(v.name, 'Usuário Removido') as author, v.email as author_email, v.avatar_url as author_avatar,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND volunteer_id = ?) as liked_by_me
         FROM posts p 
-        JOIN volunteers v ON p.author_id = v.id 
+        LEFT JOIN volunteers v ON p.author_id = v.id 
         ORDER BY p.id DESC
     `;
     
@@ -147,9 +153,9 @@ app.get('/api/posts', (req, res) => {
         
         db.all('SELECT * FROM post_media', (err, media) => {
             const commentsQuery = `
-                SELECT c.*, v.name as author, v.email as author_email, v.avatar_url as author_avatar 
+                SELECT c.*, COALESCE(v.name, 'Usuário Removido') as author, v.email as author_email, v.avatar_url as author_avatar 
                 FROM comments c 
-                JOIN volunteers v ON c.author_id = v.id
+                LEFT JOIN volunteers v ON c.author_id = v.id
             `;
             
             db.all(commentsQuery, (err, comments) => {
@@ -198,9 +204,15 @@ app.put('/api/posts/:id', (req, res) => {
 });
 
 app.delete('/api/posts/:id', (req, res) => {
-    db.run('DELETE FROM posts WHERE id=?', req.params.id, function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
+    const id = req.params.id;
+    // Auditoria: Salvando ID antes da remoção
+    db.run('INSERT INTO deletion_audit (table_name, record_id) VALUES (?, ?)', ['posts', id], (err) => {
+        if (err) console.error('Erro ao auditar deleção:', err.message);
+
+        db.run('DELETE FROM posts WHERE id=?', id, function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        });
     });
 });
 
@@ -244,9 +256,15 @@ app.put('/api/comments/:id', (req, res) => {
 });
 
 app.delete('/api/comments/:id', (req, res) => {
-    db.run('DELETE FROM comments WHERE id=?', req.params.id, function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
+    const id = req.params.id;
+    // Auditoria: Salvando ID antes da remoção
+    db.run('INSERT INTO deletion_audit (table_name, record_id) VALUES (?, ?)', ['comments', id], (err) => {
+        if (err) console.error('Erro ao auditar deleção:', err.message);
+
+        db.run('DELETE FROM comments WHERE id=?', id, function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        });
     });
 });
 

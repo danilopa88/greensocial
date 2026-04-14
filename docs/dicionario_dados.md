@@ -23,15 +23,17 @@ Armazena as informações cadastrais de todos os membros e administradores.
 ### 2. `posts` (Postagens do Feed)
 Armazena os textos publicados pelos voluntários.
 
-| Coluna | Tipo | Descrição |
-| :--- | :--- | :--- |
-| `id` | INTEGER | Chave Primária (Auto-incremento). |
-| `author_id` | INTEGER | Chave Estrangeira vinculada a `volunteers(id)`. |
-| `time` | TEXT | Representação amigável do horário (ex: "Agora"). |
-| `content` | TEXT | Conteúdo textual da postagem. |
-| `likes` | INTEGER | Contador de curtidas (Default: 0). |
-| `created_at` | DATETIME | Data de criação (UTC). |
-| `updated_at` | DATETIME | Data da última edição (UTC). |
+| Coluna | Tipo | Restrição | Descrição |
+| :--- | :--- | :--- | :--- |
+| `id` | INTEGER | PK, Auto-incremento | Identificador único do post. |
+| `author_id` | INTEGER | FK → `volunteers(id)` **SET NULL** | ID do autor. `NULL` se o usuário foi removido. |
+| `time` | TEXT | — | Representação amigável do horário (ex: "Agora"). |
+| `content` | TEXT | — | Conteúdo textual da postagem. |
+| `likes` | INTEGER | Default: 0 | Contador de curtidas. |
+| `created_at` | DATETIME | Default: CURRENT_TIMESTAMP | Data de criação (UTC). |
+| `updated_at` | DATETIME | Default: CURRENT_TIMESTAMP | Data da última edição (UTC). |
+
+> **Nota:** Quando o autor é removido, `author_id` fica `NULL` e o sistema exibe **"Usuário Removido"** no feed. O post é **preservado**.
 
 ---
 
@@ -50,14 +52,16 @@ Armazena os links de fotos e vídeos associados a cada postagem.
 ### 4. `comments` (Comentários)
 Armazena as interações textuais nas postagens.
 
-| Coluna | Tipo | Descrição |
-| :--- | :--- | :--- |
-| `id` | INTEGER | Chave Primária (Auto-incremento). |
-| `post_id` | INTEGER | Chave Estrangeira vinculada a `posts(id)`. |
-| `author_id` | INTEGER | Chave Estrangeira vinculada a `volunteers(id)`. |
-| `text` | TEXT | Conteúdo do comentário. |
-| `created_at` | DATETIME | Data de criação (UTC). |
-| `updated_at` | DATETIME | Data da última edição (UTC). |
+| Coluna | Tipo | Restrição | Descrição |
+| :--- | :--- | :--- | :--- |
+| `id` | INTEGER | PK, Auto-incremento | Identificador único do comentário. |
+| `post_id` | INTEGER | FK → `posts(id)` CASCADE | Post ao qual pertence. |
+| `author_id` | INTEGER | FK → `volunteers(id)` **SET NULL** | ID do autor. `NULL` se o usuário foi removido. |
+| `text` | TEXT | NOT NULL | Conteúdo do comentário. |
+| `created_at` | DATETIME | Default: CURRENT_TIMESTAMP | Data de criação (UTC). |
+| `updated_at` | DATETIME | Default: CURRENT_TIMESTAMP | Data da última edição (UTC). |
+
+> **Nota:** Quando o autor é removido, o comentário é **preservado** e exibido como **"Usuário Removido"**.
 
 ---
 
@@ -85,5 +89,28 @@ Registra o histórico de entradas e saídas do sistema.
 
 ---
 
+### 7. `deletion_audit` (Log de Exclusões)
+Registra todas as exclusões manuais realizadas no sistema para rastreamento e auditoria de segurança.
+
+| Coluna | Tipo | Descrição |
+| :--- | :--- | :--- |
+| `id` | INTEGER | Chave Primária (Auto-incremento). |
+| `table_name` | TEXT | Nome da tabela onde ocorreu a exclusão (ex: `volunteers`, `posts`, `comments`). |
+| `record_id` | INTEGER | ID do registro que foi removido. |
+| `deletion_date` | DATETIME | Data e hora da exclusão (UTC). |
+
+> **Nota:** Este log não armazena o conteúdo do registro, apenas o identificador e o momento da exclusão. Para recuperação de dados, utilize os backups diários em `/backups`.
+
+---
+
 ## 🔗 Relacionamentos (Foreign Keys)
-- Todas as tabelas possuem a regra `ON DELETE CASCADE`. Ou seja, se um voluntário for deletado, suas postagens, comentários e curtidas serão removidos automaticamente para manter a integridade do banco.
+
+| Tabela | Coluna | Referência | Comportamento na deleção |
+| :--- | :--- | :--- | :--- |
+| `posts` | `author_id` | `volunteers(id)` | **SET NULL** – post preservado |
+| `post_media` | `post_id` | `posts(id)` | CASCADE – mídia removida com o post |
+| `comments` | `post_id` | `posts(id)` | CASCADE – comentário removido com o post |
+| `comments` | `author_id` | `volunteers(id)` | **SET NULL** – comentário preservado |
+| `post_likes` | `post_id` | `posts(id)` | CASCADE – curtida removida com o post |
+| `post_likes` | `volunteer_id` | `volunteers(id)` | CASCADE – curtida removida com o usuário |
+| `user_access` | `volunteer_id` | `volunteers(id)` | CASCADE – histórico de acesso removido |
