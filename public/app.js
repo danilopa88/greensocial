@@ -230,6 +230,10 @@ function loginAs(email, role, id) {
     document.getElementById('my-profile-bio').innerText = volBio;
     document.getElementById('my-profile-email').value = email;
     document.getElementById('my-profile-skills').value = volSkills;
+    const profilePhone = document.getElementById('my-profile-phone');
+    const profileBirth = document.getElementById('my-profile-birth-date');
+    if (profilePhone) profilePhone.value = (vol && vol.phone) ? vol.phone : '—';
+    if (profileBirth) profileBirth.value = (vol && vol.birth_date) ? vol.birth_date : '—';
     const profileAvatarEl = document.getElementById('my-profile-avatar');
     if (profileAvatarEl) {
         profileAvatarEl.src = getAvatarUrl(userNameStr, vol ? vol.avatar_url : null);
@@ -271,6 +275,8 @@ function initExcelExport() {
             "ID do Sistema": v.id,
             "Nome Completo": v.name,
             "E-mail": v.email,
+            "Telefone": v.phone || '',
+            "Data de Nascimento": v.birth_date || '',
             "Habilidades": v.skills,
             "Situação": v.status
         }));
@@ -667,6 +673,8 @@ function renderVolunteers() {
                 </div>
             </td>
             <td>${escapeHTML(vol.email)}</td>
+            <td>${escapeHTML(vol.phone || '—')}</td>
+            <td>${escapeHTML(vol.birth_date || '—')}</td>
             <td class="skills-list">${escapeHTML(vol.skills)}</td>
             <td><span class="badge ${statusClass}">${escapeHTML(vol.status)}</span></td>
             <td>
@@ -686,6 +694,8 @@ window.openEditVolunteerModal = function (id) {
     document.getElementById("vol-name").value = vol.name;
     document.getElementById("vol-email").value = vol.email;
     document.getElementById("vol-skills").value = vol.skills;
+    document.getElementById("vol-phone").value = vol.phone || '';
+    document.getElementById("vol-birth-date").value = vol.birth_date || '';
     const statusSelect = document.getElementById("vol-status");
     if (statusSelect) statusSelect.value = vol.status;
     document.getElementById("modal-add-volunteer").classList.add("open");
@@ -721,18 +731,32 @@ function initModalEvents() {
         const skills = document.getElementById("vol-skills").value.trim() || "Geral";
         const statusSelect = document.getElementById("vol-status");
         const status = statusSelect ? statusSelect.value : "Ativo";
+        const phone = document.getElementById("vol-phone").value.trim() || null;
+        const birth_date = document.getElementById("vol-birth-date").value.trim() || null;
+
+        // Validação de telefone
+        if (phone && !/^\d{2}-\d{8,9}$/.test(phone)) {
+            alert('Formato de telefone inválido. Use: XX-XXXXXXXX ou XX-XXXXXXXXX');
+            return;
+        }
+        // Validação de data de nascimento
+        if (birth_date && !/^\d{2}\/\d{2}\/\d{4}$/.test(birth_date)) {
+            alert('Formato de data inválido. Use: DD/MM/AAAA');
+            return;
+        }
+
         if (editingVolunteerId) {
             await fetch(`${API_BASE}/volunteers/${editingVolunteerId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, skills, status })
+                body: JSON.stringify({ name, email, skills, status, phone, birth_date })
             });
             editingVolunteerId = null;
         } else {
             await fetch(`${API_BASE}/volunteers`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, skills, status })
+                body: JSON.stringify({ name, email, skills, status, phone, birth_date })
             });
         }
         await loadInitialData();

@@ -120,6 +120,8 @@
                             <tr>
                                 <th>Nome Completo</th>
                                 <th>Email</th>
+                                <th>Telefone</th>
+                                <th>Data de Nasc.</th>
                                 <th>Habilidades</th>
                                 <th>Status</th>
                                 <th>Ações</th>
@@ -158,6 +160,16 @@
                             <label>Email</label>
                             <input type="text" value="" disabled id="my-profile-email">
                         </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Telefone</label>
+                                <input type="text" value="" disabled id="my-profile-phone">
+                            </div>
+                            <div class="form-group">
+                                <label>Data de Nascimento</label>
+                                <input type="text" value="" disabled id="my-profile-birth-date">
+                            </div>
+                        </div>
                         <div class="form-group">
                             <label>Suas Habilidades</label>
                             <input type="text" value="" disabled id="my-profile-skills">
@@ -184,6 +196,16 @@
                     <div class="form-group">
                         <label for="vol-skills">Habilidades (separadas por vírgula)</label>
                         <input type="text" id="vol-skills" placeholder="Ex: Culinária, Música, Excel">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="vol-phone">Telefone</label>
+                            <input type="text" id="vol-phone" placeholder="Ex: 11-999999999" maxlength="12">
+                        </div>
+                        <div class="form-group">
+                            <label for="vol-birth-date">Data de Nascimento</label>
+                            <input type="text" id="vol-birth-date" placeholder="DD/MM/AAAA" maxlength="10">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="vol-status">Status</label>

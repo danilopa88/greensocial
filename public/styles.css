@@ -756,6 +756,18 @@ body::before {
     flex-direction: column;
 }
 
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 0;
+}
+
+.form-row .form-group {
+    margin-bottom: 1.5rem;
+    min-width: 0; /* Evita overflow em grids */
+}
+
 .form-group label {
     font-weight: 500;
     font-size: 0.9rem;

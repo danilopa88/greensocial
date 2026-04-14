@@ -19,12 +19,16 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 email TEXT UNIQUE NOT NULL,
                 skills TEXT,
                 status TEXT,
-                avatar_url TEXT
+                avatar_url TEXT,
+                phone TEXT,
+                birth_date TEXT
             )`, () => {
                 // Migração garantida para bancos existentes
                 db.all("PRAGMA table_info(volunteers)", (err, columns) => {
-                    if (!err && columns && !columns.some(c => c.name === 'avatar_url')) {
-                        db.run('ALTER TABLE volunteers ADD COLUMN avatar_url TEXT');
+                    if (!err && columns) {
+                        if (!columns.some(c => c.name === 'avatar_url')) db.run('ALTER TABLE volunteers ADD COLUMN avatar_url TEXT');
+                        if (!columns.some(c => c.name === 'phone'))      db.run('ALTER TABLE volunteers ADD COLUMN phone TEXT');
+                        if (!columns.some(c => c.name === 'birth_date')) db.run('ALTER TABLE volunteers ADD COLUMN birth_date TEXT');
                     }
                 });
             });
@@ -32,13 +36,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
             // Posts (Agora ligada ao ID do autor)
             db.run(`CREATE TABLE IF NOT EXISTS posts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                author_id INTEGER NOT NULL,
+                author_id INTEGER,
                 time TEXT,
                 content TEXT,
                 likes INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE CASCADE
+                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE SET NULL
             )`, () => {
                 db.all("PRAGMA table_info(posts)", (err, columns) => {
                     if (!err && columns) {
@@ -61,12 +65,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
             db.run(`CREATE TABLE IF NOT EXISTS comments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 post_id INTEGER NOT NULL,
-                author_id INTEGER NOT NULL,
+                author_id INTEGER,
                 text TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
-                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE CASCADE
+                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE SET NULL
             )`, () => {
                 db.all("PRAGMA table_info(comments)", (err, columns) => {
                     if (!err && columns) {
@@ -102,6 +106,64 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 logoff_time TEXT,
                 FOREIGN KEY (volunteer_id) REFERENCES volunteers(id) ON DELETE CASCADE
             )`);
+
+            // Auditoria de Exclusões (Log de segurança)
+            db.run(`CREATE TABLE IF NOT EXISTS deletion_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                table_name TEXT NOT NULL,
+                record_id INTEGER NOT NULL,
+                deletion_date DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`);
+
+            // === MIGRAÇÃO: Mudar CASCADE para SET NULL em Posts e Comments ===
+            const migrateTable = (tableName, createSql) => {
+                db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name=?`, [tableName], (err, row) => {
+                    // Só migra se ainda tiver CASCADE na relação com volunteers E NÃO tiver SET NULL
+                    const needsMigration = !err && row && 
+                        row.sql.includes('author_id') &&
+                        row.sql.toUpperCase().includes('ON DELETE CASCADE') &&
+                        !row.sql.toUpperCase().includes('ON DELETE SET NULL');
+
+                    if (needsMigration) {
+                        console.log(`Migrando tabela ${tableName} para suportar preservação de dados...`);
+                        db.serialize(() => {
+                            db.run(`PRAGMA foreign_keys = OFF`);
+                            db.run(`PRAGMA legacy_alter_table = ON`);
+                            db.run(`ALTER TABLE ${tableName} RENAME TO ${tableName}_old`);
+                            db.run(createSql);
+                            db.run(`INSERT INTO ${tableName} SELECT * FROM ${tableName}_old`);
+                            db.run(`DROP TABLE ${tableName}_old`);
+                            db.run(`PRAGMA legacy_alter_table = OFF`);
+                            db.run(`PRAGMA foreign_keys = ON`);
+                        });
+                    }
+                });
+            };
+
+            const postsSql = `CREATE TABLE IF NOT EXISTS posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                author_id INTEGER,
+                time TEXT,
+                content TEXT,
+                likes INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE SET NULL
+            )`;
+
+            const commentsSql = `CREATE TABLE IF NOT EXISTS comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER NOT NULL,
+                author_id INTEGER,
+                text TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+                FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE SET NULL
+            )`;
+
+            migrateTable('posts', postsSql);
+            migrateTable('comments', commentsSql);
 
             // Seed inicial para não deixar o app vazio
             db.get(`SELECT COUNT(*) as count FROM volunteers`, (err, row) => {
