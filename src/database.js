@@ -128,10 +128,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
                         console.log(`Migrando tabela ${tableName} para suportar preservação de dados...`);
                         db.serialize(() => {
                             db.run(`PRAGMA foreign_keys = OFF`);
+                            db.run(`PRAGMA legacy_alter_table = ON`);
                             db.run(`ALTER TABLE ${tableName} RENAME TO ${tableName}_old`);
                             db.run(createSql);
                             db.run(`INSERT INTO ${tableName} SELECT * FROM ${tableName}_old`);
                             db.run(`DROP TABLE ${tableName}_old`);
+                            db.run(`PRAGMA legacy_alter_table = OFF`);
                             db.run(`PRAGMA foreign_keys = ON`);
                         });
                     }
