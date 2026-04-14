@@ -1,0 +1,9 @@
+{
+  "host": "smtp-relay.brevo.com",
+  "port": 587,
+  "user": "SEU_EMAIL_DA_CONTA_BREVO",
+  "pass": "COLOQUE_SUA_CHAVE_SMTP_AQUI",
+  "from_name": "Greensocial",
+  "from_email": "SEU_EMAIL_DA_CONTA_BREVO",
+  "admin_email": "SEU_EMAIL_PARA_RECEBER_RELATORIOS"
+}

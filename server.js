@@ -5,7 +5,9 @@ const multer = require('multer');
 const path = require('path');
 const db = require('./src/database'); 
 const fs = require('fs');
+const cron = require('node-cron');
 const { initBackupScheduler } = require('./src/backup');
+const mailer = require('./src/mailer');
 
 // Configuração de diretórios para o executável (pkg)
 const internalDir = __dirname;
@@ -18,6 +20,14 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Inicializa o sistema de backup diário
 initBackupScheduler();
+
+// Relatório semanal automático: toda segunda-feira às 08:00
+cron.schedule('0 8 * * 1', () => {
+    console.log('📊 Enviando relatório semanal por e-mail...');
+    db.all('SELECT * FROM volunteers', (err, rows) => {
+        if (!err && rows) mailer.sendWeeklyReport(rows);
+    });
+});
 
 const app = express();
 
@@ -83,15 +93,24 @@ app.post('/api/volunteers', (req, res) => {
     const { name, email, skills, status, phone, birth_date } = req.body;
     db.run('INSERT INTO volunteers (name, email, skills, status, phone, birth_date) VALUES (?, ?, ?, ?, ?, ?)', [name, email, skills, status, phone || null, birth_date || null], function(err) {
         if (err) return res.status(500).json({ error: err.message });
+        // Envia e-mail de boas-vindas ao novo voluntário
+        if (email) mailer.sendWelcomeEmail(name, email);
         res.json({ id: this.lastID, name, email, skills, status, phone, birth_date });
     });
 });
 
 app.put('/api/volunteers/:id', (req, res) => {
     const { name, email, skills, status, phone, birth_date } = req.body;
-    db.run('UPDATE volunteers SET name=?, email=?, skills=?, status=?, phone=?, birth_date=? WHERE id=?', [name, email, skills, status, phone || null, birth_date || null, req.params.id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
+    // Verifica status anterior para acionar notificação de inativação
+    db.get('SELECT status, email, name FROM volunteers WHERE id = ?', [req.params.id], (err, old) => {
+        db.run('UPDATE volunteers SET name=?, email=?, skills=?, status=?, phone=?, birth_date=? WHERE id=?', [name, email, skills, status, phone || null, birth_date || null, req.params.id], function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            // Envia aviso se conta foi desativada
+            if (!err && old && old.status === 'Ativo' && status === 'Inativo') {
+                mailer.sendDeactivationEmail(name || old.name, email || old.email);
+            }
+            res.json({ success: true });
+        });
     });
 });
 
@@ -265,6 +284,24 @@ app.delete('/api/comments/:id', (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true });
         });
+    });
+});
+
+// === ROTAS DE E-MAIL ===
+app.post('/api/email/newsletter', async (req, res) => {
+    const { subject, message, recipients } = req.body;
+    if (!subject || !message || !recipients || recipients.length === 0) {
+        return res.status(400).json({ error: 'Dados incompletos.' });
+    }
+    const result = await mailer.sendNewsletter(recipients, subject, message);
+    res.json(result);
+});
+
+app.post('/api/email/weekly-report', (req, res) => {
+    db.all('SELECT * FROM volunteers', (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        mailer.sendWeeklyReport(rows);
+        res.json({ success: true, message: 'Relatório sendo enviado...' });
     });
 });
 
