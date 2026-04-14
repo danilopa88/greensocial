@@ -114,7 +114,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
             // === MIGRAÇÃO: Mudar CASCADE para SET NULL em Posts e Comments ===
             const migrateTable = (tableName, createSql) => {
                 db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name=?`, [tableName], (err, row) => {
-                    if (!err && row && row.sql.includes('ON DELETE CASCADE') && row.sql.includes('author_id')) {
+                    // Só migra se ainda tiver CASCADE na relação com volunteers E NÃO tiver SET NULL
+                    const needsMigration = !err && row && 
+                        row.sql.includes('author_id') &&
+                        row.sql.toUpperCase().includes('ON DELETE CASCADE') &&
+                        !row.sql.toUpperCase().includes('ON DELETE SET NULL');
+
+                    if (needsMigration) {
                         console.log(`Migrando tabela ${tableName} para suportar preservação de dados...`);
                         db.serialize(() => {
                             db.run(`PRAGMA foreign_keys = OFF`);
