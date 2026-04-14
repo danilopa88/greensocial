@@ -37,7 +37,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
             db.run(`CREATE TABLE IF NOT EXISTS posts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 author_id INTEGER,
-                time TEXT,
                 content TEXT,
                 likes INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -143,7 +142,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
             const postsSql = `CREATE TABLE IF NOT EXISTS posts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 author_id INTEGER,
-                time TEXT,
                 content TEXT,
                 likes INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -176,8 +174,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
                         // Inserir post semente após os voluntários garantirem os IDs
                         db.get(`SELECT id FROM volunteers WHERE email = 'admin@greensocial.org'`, (err, admin) => {
                             if (admin) {
-                                db.run(`INSERT INTO posts (author_id, time, content, likes) VALUES (?, ?, ?, ?)`,
-                                    [admin.id, "Início", "Bem-vindo à nova plataforma da comunidade! Agora com banco de dados real e integridade total. 🎉", 10]
+                                db.run(`INSERT INTO posts (author_id, content, likes) VALUES (?, ?, ?)`,
+                                    [admin.id, "Bem-vindo à nova plataforma da comunidade! Agora com banco de dados real e integridade total. 🎉", 10]
                                 );
                             }
                         });

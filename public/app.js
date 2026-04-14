@@ -445,12 +445,20 @@ function renderPosts() {
 
         const displayAuthor = isMe ? `${escapeHTML(post.author)} <span style="opacity:0.6;font-size:0.8rem;">(Você)</span>` : escapeHTML(post.author);
 
+        let displayTime = "Agora mesmo";
+        if (post.created_at) {
+            // Replace space with T to make it valid ISO string, and append Z to indicate UTC
+            let isoString = post.created_at.replace(' ', 'T') + 'Z';
+            let d = new Date(isoString);
+            if (!isNaN(d)) displayTime = d.toLocaleString('pt-BR');
+        }
+
         postEl.innerHTML = `
             <div class="post-header">
                 <img src="${postAvatar}" alt="Avatar" class="avatar">
                 <div>
                     <div class="post-author">${displayAuthor}</div>
-                    <div class="post-time">${escapeHTML(post.time)}</div>
+                    <div class="post-time">${escapeHTML(displayTime)}</div>
                 </div>
                 ${actionsHtml}
             </div>
@@ -635,7 +643,6 @@ function initPostEvent() {
         if (content || currentMediaItems.length > 0) {
             const formData = new FormData();
             formData.append('author_id', currentUserId);
-            formData.append('time', "Agora mesmo");
             formData.append('content', content);
             currentMediaItems.forEach(item => {
                 formData.append('media', item.fileData);

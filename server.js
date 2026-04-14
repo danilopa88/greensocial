@@ -177,8 +177,8 @@ app.get('/api/posts', (req, res) => {
 });
 
 app.post('/api/posts', upload.array('media'), (req, res) => {
-    const { author_id, content, time } = req.body;
-    db.run('INSERT INTO posts (author_id, time, content) VALUES (?, ?, ?)', [author_id, time || 'Agora', content || ''], function(err) {
+    const { author_id, content } = req.body;
+    db.run('INSERT INTO posts (author_id, content) VALUES (?, ?)', [author_id, content || ''], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         const postId = this.lastID;
         
