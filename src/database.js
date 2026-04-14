@@ -3,7 +3,7 @@ const path = require('path');
 
 const dbPath = process.pkg 
     ? path.join(path.dirname(process.execPath), 'database.sqlite')
-    : path.resolve(__dirname, 'database.sqlite');
+    : path.resolve(__dirname, '..', 'database.sqlite');
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Erro ao abrir o banco de dados:', err.message);
@@ -36,8 +36,17 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 time TEXT,
                 content TEXT,
                 likes INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE CASCADE
-            )`);
+            )`, () => {
+                db.all("PRAGMA table_info(posts)", (err, columns) => {
+                    if (!err && columns) {
+                        if (!columns.some(c => c.name === 'created_at')) db.run("ALTER TABLE posts ADD COLUMN created_at DATETIME DEFAULT '2026-04-14 14:00:00'");
+                        if (!columns.some(c => c.name === 'updated_at')) db.run("ALTER TABLE posts ADD COLUMN updated_at DATETIME DEFAULT '2026-04-14 14:00:00'");
+                    }
+                });
+            });
 
             // Post Media
             db.run(`CREATE TABLE IF NOT EXISTS post_media (
@@ -54,18 +63,36 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 post_id INTEGER NOT NULL,
                 author_id INTEGER NOT NULL,
                 text TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
                 FOREIGN KEY (author_id) REFERENCES volunteers(id) ON DELETE CASCADE
-            )`);
+            )`, () => {
+                db.all("PRAGMA table_info(comments)", (err, columns) => {
+                    if (!err && columns) {
+                        if (!columns.some(c => c.name === 'created_at')) db.run("ALTER TABLE comments ADD COLUMN created_at DATETIME DEFAULT '2026-04-14 14:00:00'");
+                        if (!columns.some(c => c.name === 'updated_at')) db.run("ALTER TABLE comments ADD COLUMN updated_at DATETIME DEFAULT '2026-04-14 14:00:00'");
+                    }
+                });
+            });
 
             // Likes Tracking (Para curtida única por usuário)
             db.run(`CREATE TABLE IF NOT EXISTS post_likes (
                 post_id INTEGER NOT NULL,
                 volunteer_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (post_id, volunteer_id),
                 FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
                 FOREIGN KEY (volunteer_id) REFERENCES volunteers(id) ON DELETE CASCADE
-            )`);
+            )`, () => {
+                db.all("PRAGMA table_info(post_likes)", (err, columns) => {
+                    if (!err && columns) {
+                        if (!columns.some(c => c.name === 'created_at')) db.run("ALTER TABLE post_likes ADD COLUMN created_at DATETIME DEFAULT '2026-04-14 14:00:00'");
+                        if (!columns.some(c => c.name === 'updated_at')) db.run("ALTER TABLE post_likes ADD COLUMN updated_at DATETIME DEFAULT '2026-04-14 14:00:00'");
+                    }
+                });
+            });
 
             // Auditoria de Acessos
             db.run(`CREATE TABLE IF NOT EXISTS user_access (

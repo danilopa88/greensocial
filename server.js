@@ -191,7 +191,7 @@ app.post('/api/posts', upload.array('media'), (req, res) => {
 
 app.put('/api/posts/:id', (req, res) => {
     const { content } = req.body;
-    db.run('UPDATE posts SET content=? WHERE id=?', [content, req.params.id], function(err) {
+    db.run('UPDATE posts SET content=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', [content, req.params.id], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
     });
@@ -237,7 +237,7 @@ app.post('/api/posts/:id/comments', (req, res) => {
 
 app.put('/api/comments/:id', (req, res) => {
     const { text } = req.body;
-    db.run('UPDATE comments SET text=? WHERE id=?', [text, req.params.id], function(err) {
+    db.run('UPDATE comments SET text=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', [text, req.params.id], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
     });
