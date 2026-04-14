@@ -1,7 +1,5 @@
-node_modules/
-backups/
+uploads/
 database.sqlite
 greensocial.exe
-uploads/
 *.log
 .DS_Store
