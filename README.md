@@ -1,89 +1,159 @@
 # 🍃 Greensocial
 
-**Greensocial** é uma plataforma moderna e intuitiva de gestão para comunidades de voluntários. O projeto oferece um feed social interativo, painel administrativo para gestão de membros, armazenamento organizado de arquivos e um sistema robusto de segurança e auditoria.
+**Greensocial** é uma plataforma moderna e intuitiva de gestão para comunidades de voluntários. O projeto oferece um feed social interativo, painel administrativo, gestão de voluntários, sistema de e-mails com métricas e um repositório robusto de segurança e auditoria.
+
+---
 
 ## 🚀 Funcionalidades
 
--   **Feed Social Interativo**: Publique textos, fotos e vídeos para a comunidade com redimensionamento inteligente.
--   **Sistema de Comentários e Curtidas**: Engajamento real entre os voluntários.
--   **Gestão Profissional de Comentários**: Menu de opções (três pontos) para **Editar** e **Excluir** seus próprios comentários.
--   **Perfis Customizados**: Upload de fotos de perfil com sistema de **recorte circular** (Cropper.js).
--   **Segurança Blindada**: Proteção nativa contra ataques de **SQL Injection** e **XSS** (Cross-Site Scripting).
--   **Auditoria de Acessos**: Registro completo de **Login e Logoff** dos usuários para controle administrativo.
--   **Gestão de Voluntários**: Painel administrativo para cadastrar, editar e remover membros (Exclusivo para ADMIN).
--   **Exportação Inteligente**: Gere relatórios em formato Excel (.xlsx) dos voluntários com um clique.
--   **Organização de Arquivos**: Mídias organizadas automaticamente em subpastas por usuário (`ID/profile` e `ID/posts`).
--   **Backup Automático Diário**: Sistema de proteção que realiza cópias de segurança do banco de dados a cada 24 horas.
+### Feed Social
+- **Publicações com mídia**: Textos, fotos e vídeos com redimensionamento inteligente.
+- **Comentários e Curtidas**: Engajamento real entre os voluntários.
+- **Gerenciamento de Conteúdo**: Menu de opções (três pontos) para **Editar** e **Excluir** posts e comentários próprios (admins podem moderar qualquer conteúdo).
 
-## 🛠️ Tecnologias Utilizadas
+### Gestão de Voluntários (Admin)
+- **Painel CRUD completo**: Cadastrar, editar, desativar e remover membros.
+- **Campos**: Nome, e-mail, telefone, data de nascimento, habilidades e status.
+- **Exportação XLSX**: Gere relatórios em formato Excel com um clique.
+- **Perfis Customizados**: Upload de foto de perfil com **recorte circular** (Cropper.js).
 
--   **Frontend**: HTML5, CSS3 (Vanilla), JavaScript (ES6+), **Cropper.js**.
--   **Backend**: Node.js, Express, **Helmet** (Segurança).
--   **Banco de Dados**: SQLite3 com persistência real.
--   **Uploads**: Multer com diretórios dinâmicos.
--   **Binários**: **pkg** (gera executável direto para Windows).
--   **Agendamento**: Node-cron (Backups).
+### Sistema de E-mail (Brevo)
+- **Boas-vindas automáticas**: E-mail enviado ao cadastrar um novo voluntário.
+- **Aviso de Inativação**: Notificação automática ao desativar uma conta.
+- **Comunicados (Newsletter)**: Envio de avisos para todos os voluntários **Ativos** pelo painel Admin.
+- **Relatório Semanal**: Enviado toda segunda-feira às 08h00 para o e-mail do administrador, incluindo KPIs de e-mail e resumo da base.
+- **KPIs no Relatório** (requer `api_key` do Brevo):
+  - Taxa de Entrega, Abertura, Clique (CTR), CTOR
+  - Taxa de Rejeição, Descadastro e Spam
+- **Opt-out de E-mail**: Campo `email_opt_out` na tabela `volunteers` — voluntários com esse campo ativo não recebem newsletters.
+- **Log de Comunicados**: Tabela `email_logs` registra assunto, remetente, nº de destinatários, messageIds e data de envio.
+
+### Segurança e Auditoria
+- **XSS Prevention**: Sanitização em todas as exibições do frontend.
+- **SQL Sanitized**: Todas as consultas protegidas contra SQL Injection.
+- **Auditoria de Acessos**: Tabela `user_access` — registra Login e Logoff de cada voluntário.
+- **Log de Exclusões**: Tabela `deletion_audit` — registra toda exclusão de posts, comentários e voluntários.
+- **Proteção de Mídia**: Remove arquivos de avatar antigos automaticamente.
+
+### Backup e Dados
+- **Backup automático diário**: Cópia do banco às 00h00.
+- **Retenção de 7 dias**: Mantém os últimos 7 backups em `/backups`.
+
+---
+
+## 🛠️ Tecnologias
+
+| Camada | Tecnologia |
+|---|---|
+| Frontend | HTML5, CSS3 (Vanilla), JavaScript ES6+ |
+| UI Libs | FontAwesome, Cropper.js, SheetJS |
+| Backend | Node.js, Express |
+| Segurança | Helmet (CSP, XSS Headers) |
+| Banco de Dados | SQLite3 |
+| Uploads | Multer (diretórios dinâmicos por ID) |
+| E-mail | Nodemailer (SMTP) + **@getbrevo/brevo API v3** |
+| Agendamento | Node-cron (backup + relatório semanal) |
+| Build | pkg (executável Windows `.exe`) |
+
+---
+
+## ⚙️ Configuração de E-mail (`email.config.json`)
+
+O arquivo `email.config.json` deve estar **na mesma pasta do executável** (ou na raiz do projeto em modo dev). **Nunca versione este arquivo** — ele está no `.gitignore`.
+
+Use `email.config.example.json` como modelo:
+
+```json
+{
+  "host": "smtp-relay.brevo.com",
+  "port": 587,
+  "user": "SEU_LOGIN_SMTP_BREVO",
+  "pass": "SUA_CHAVE_SMTP",
+  "api_key": "SUA_API_KEY_BREVO",
+  "from_name": "Greensocial",
+  "from_email": "seu@email.com",
+  "admin_email": "admin@email.com"
+}
+```
+
+| Campo | Obrigatório | Onde obter |
+|---|---|---|
+| `user` / `pass` | Sim (envio SMTP) | Brevo → Settings → SMTP & API → aba SMTP |
+| `api_key` | Sim (métricas) | Brevo → Settings → SMTP & API → aba API Keys |
+| `from_email` | Sim | E-mail verificado no Brevo |
+| `admin_email` | Sim | E-mail que receberá o relatório semanal |
+
+> **Sem `api_key`**: o sistema envia e-mails normalmente via SMTP, mas o relatório semanal não inclui os KPIs de métricas.
+
+---
 
 ## 📦 Como Instalar e Rodar
 
-O projeto pode ser executado de duas formas: como desenvolvedor (usando Node.js) ou via executável pronto para Windows.
+### Pré-requisitos
+- [Node.js](https://nodejs.org/) instalado
 
-### 💻 Modo Desenvolvedor (Para quem quer editar o código)
+### Modo Desenvolvedor
 
-1.  **Abra o Terminal na pasta do projeto**: No Windows, entre na pasta `App`, segure a tecla `Shift`, clique com o botão direito em um espaço vazio e escolha **"Abrir janela do PowerShell aqui"** ou **"Abrir no Terminal"**.
-2.  **Pré-requisitos**: Certifique-se de ter o [Node.js](https://nodejs.org/) instalado em seu computador.
-3.  **Instale as Dependências**: Digite o comando abaixo e aperte Enter. Isso criará a pasta `node_modules`.
-    ```bash
-    npm install
-    ```
-4.  **Inicie o Servidor**: Escolha um dos comandos abaixo:
-    - **Para uso normal**: 
-      ```bash
-      npm start
-      ```
-    - **Para desenvolvimento** (O servidor reinicia sozinho ao salvar arquivos): 
-      ```bash
-      npm run dev
-      ```
-5.  **Acesse no Navegador**: Abra o endereço [http://localhost:3000](http://localhost:3000).
+```bash
+# 1. Instale as dependências
+npm install
 
-### Como Gerar o Executável (Build)
-Se você precisar criar uma nova versão do arquivo `.exe`:
-1.  **Comando**:
-    ```bash
-    npm run build
-    ```
-2.  O arquivo `greensocial.exe` será gerado/atualizado na raiz do projeto.
+# 2. Inicie o servidor
+npm start
 
-### Modo Executável (Windows)
-Se você já possui o arquivo `greensocial.exe`, basta executá-lo. O sistema criará automaticamente as pastas de banco de dados e uploads necessárias.
+# Ou com hot-reload (desenvolvimento)
+npm run dev
+```
 
-## 🛡️ Segurança e Auditoria
+Acesse: [http://localhost:3000](http://localhost:3000)
 
-O Greensocial foi construído com foco em integridade:
-- **XSS Prevention**: Filtro de sanitização em todas as exibições do frontend.
-- **SQL Sanitized**: Todas as consultas são protegidas contra injeção de código.
-- **Tabela de Auditoria**: Acesse a tabela `user_access` para verificar horários de entrada e saída dos voluntários.
-- **Proteção de Mídia**: O servidor remove automaticamente arquivos de avatar antigos para otimizar o armazenamento.
+### Gerar Executável para Windows
 
-## 💾 Sistema de Backup
+```bash
+npm run build
+```
 
-- **Frequência**: Diária (00:00).
-- **Retenção**: Mantém os últimos **7 dias**.
-- **Localização**: Pasta `/backups` na raiz.
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
-## 📁 Estrutura de Pastas e Git
-
-Para manter o repositório leve e seguro, as seguintes pastas são **ignoradas pelo Git** (não são enviadas para o GitHub):
-- `/uploads`: Contém todas as mídias (fotos de perfil e posts).
-- `/node_modules`: Dependências do projeto.
-- `/backups`: Cópias de segurança do banco de dados.
-- `database.sqlite`: O banco de dados local.
-- `greensocial.exe`: O arquivo executável.
+O arquivo `greensocial.exe` será gerado na raiz do projeto. Para distribuir, copie junto:
+- `greensocial.exe`
+- `email.config.json` (com suas credenciais)
 
 ---
+
+## 🗃️ Estrutura do Banco de Dados
+
+| Tabela | Descrição |
+|---|---|
+| `volunteers` | Cadastro de voluntários (inclui `email_opt_out`) |
+| `posts` | Publicações do feed |
+| `post_media` | Mídias vinculadas a posts |
+| `post_likes` | Curtidas únicas por usuário |
+| `comments` | Comentários nos posts |
+| `user_access` | Auditoria de login/logoff |
+| `deletion_audit` | Log de todas as exclusões |
+| `email_logs` | Histórico de comunicados enviados |
+
+---
+
+## 🛡️ Segurança
+
+- **Credenciais nunca no código**: configuradas em arquivo externo (`.gitignore`'d).
+- **Helmet**: define cabeçalhos HTTP de segurança.
+- **Prepared Statements**: previnem SQL Injection em 100% das queries.
+- **Escape HTML**: previne XSS em todo conteúdo renderizado no frontend.
+
+---
+
+## 📁 Arquivos Ignorados pelo Git
+
+```
+uploads/          → Mídias dos usuários
+node_modules/     → Dependências
+backups/          → Backups do banco
+database.sqlite   → Banco de dados local
+greensocial.exe   → Executável compilado
+email.config.json → Credenciais de e-mail (SENSÍVEL)
+```
+
+---
+
 Desenvolvido com ❤️ para fortalecer comunidades de voluntários.
