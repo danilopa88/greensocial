@@ -21,14 +21,16 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 status TEXT,
                 avatar_url TEXT,
                 phone TEXT,
-                birth_date TEXT
+                birth_date TEXT,
+                email_opt_out INTEGER DEFAULT 0
             )`, () => {
                 // Migração garantida para bancos existentes
                 db.all("PRAGMA table_info(volunteers)", (err, columns) => {
                     if (!err && columns) {
-                        if (!columns.some(c => c.name === 'avatar_url')) db.run('ALTER TABLE volunteers ADD COLUMN avatar_url TEXT');
-                        if (!columns.some(c => c.name === 'phone'))      db.run('ALTER TABLE volunteers ADD COLUMN phone TEXT');
-                        if (!columns.some(c => c.name === 'birth_date')) db.run('ALTER TABLE volunteers ADD COLUMN birth_date TEXT');
+                        if (!columns.some(c => c.name === 'avatar_url'))     db.run('ALTER TABLE volunteers ADD COLUMN avatar_url TEXT');
+                        if (!columns.some(c => c.name === 'phone'))          db.run('ALTER TABLE volunteers ADD COLUMN phone TEXT');
+                        if (!columns.some(c => c.name === 'birth_date'))     db.run('ALTER TABLE volunteers ADD COLUMN birth_date TEXT');
+                        if (!columns.some(c => c.name === 'email_opt_out'))  db.run('ALTER TABLE volunteers ADD COLUMN email_opt_out INTEGER DEFAULT 0');
                     }
                 });
             });
@@ -113,6 +115,18 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 record_id INTEGER NOT NULL,
                 deletion_date DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
+
+            // Log de E-mails Enviados (Comunicados)
+            db.run(`CREATE TABLE IF NOT EXISTS email_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject TEXT NOT NULL,
+                recipients_count INTEGER NOT NULL DEFAULT 0,
+                sent_by INTEGER,
+                message_ids TEXT,
+                sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (sent_by) REFERENCES volunteers(id) ON DELETE SET NULL
+            )`);
+
 
             // === MIGRAÇÃO: Mudar CASCADE para SET NULL em Posts e Comments ===
             const migrateTable = (tableName, createSql) => {

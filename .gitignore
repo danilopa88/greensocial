@@ -26,3 +26,6 @@ Thumbs.db
 # Ambiente
 .env
 .env.local
+
+# Configuração de E-mail (contém chave SMTP — NUNCA versionar!)
+email.config.json

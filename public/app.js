@@ -45,6 +45,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initAvatarUpload();
     initClickOutside();
     initAccessLogEvents();
+    initNewsletterEvents();
 });
 
 function initAccessLogEvents() {
@@ -873,4 +874,97 @@ function initAvatarUpload() {
             }
         }, 'image/jpeg', 0.9);
     };
+}
+
+function initNewsletterEvents() {
+    const modal = document.getElementById('modal-newsletter');
+    const btnOpen = document.getElementById('btn-send-newsletter');
+    const btnClose = document.getElementById('btn-close-newsletter');
+    const btnCancel = document.getElementById('btn-cancel-newsletter');
+    const btnConfirm = document.getElementById('btn-confirm-newsletter');
+    const btnReport = document.getElementById('btn-send-report');
+    const recipientsInfo = document.getElementById('newsletter-recipients-info');
+    const feedback = document.getElementById('newsletter-feedback');
+
+    function openModal() {
+        const activeVols = volunteers.filter(v => v.status === 'Ativo');
+        recipientsInfo.textContent = `📧 ${activeVols.length} voluntário(s) ativo(s) serão notificados.`;
+        feedback.style.display = 'none';
+        document.getElementById('newsletter-subject').value = '';
+        document.getElementById('newsletter-message').value = '';
+        modal.classList.add('open');
+    }
+
+    function closeModal() {
+        modal.classList.remove('open');
+    }
+
+    if (btnOpen)    btnOpen.addEventListener('click', openModal);
+    if (btnClose)   btnClose.addEventListener('click', closeModal);
+    if (btnCancel)  btnCancel.addEventListener('click', closeModal);
+    if (modal)      modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    if (btnConfirm) {
+        btnConfirm.addEventListener('click', async () => {
+            const subject = document.getElementById('newsletter-subject').value.trim();
+            const message = document.getElementById('newsletter-message').value.trim();
+            if (!subject || !message) {
+                alert('Preencha o assunto e a mensagem.');
+                return;
+            }
+            const activeVols = volunteers.filter(v => v.status === 'Ativo');
+            if (activeVols.length === 0) {
+                alert('Não há voluntários ativos para enviar.');
+                return;
+            }
+            btnConfirm.disabled = true;
+            btnConfirm.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+
+            try {
+                const res = await fetch(`${API_BASE}/email/newsletter`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject, message, sent_by: currentUserId })
+                });
+                const data = await res.json();
+                feedback.style.display = 'block';
+                if (data.success) {
+                    feedback.style.background = '#f0fdf4';
+                    feedback.style.color = '#166534';
+                    feedback.textContent = `✅ Comunicado enviado com sucesso! ${data.sent} e-mail(s) enviados${data.failed > 0 ? `, ${data.failed} falha(s)` : ''}.`;
+                } else {
+                    feedback.style.background = '#fef2f2';
+                    feedback.style.color = '#991b1b';
+                    feedback.textContent = `❌ Erro: ${data.reason || 'Falha ao enviar e-mails.'}. Verifique email.config.json.`;
+                }
+            } catch (err) {
+                feedback.style.display = 'block';
+                feedback.style.background = '#fef2f2';
+                feedback.style.color = '#991b1b';
+                feedback.textContent = `❌ Erro de conexão: ${err.message}`;
+            } finally {
+                btnConfirm.disabled = false;
+                btnConfirm.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar Comunicado';
+            }
+        });
+    }
+
+    if (btnReport) {
+        btnReport.addEventListener('click', async () => {
+            if (!confirm('Enviar o relatório semanal agora para o admin_email configurado?')) return;
+            btnReport.disabled = true;
+            btnReport.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                const res = await fetch(`${API_BASE}/email/weekly-report`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) alert('✅ Relatório enviado! Verifique a caixa de entrada do admin.');
+                else alert('❌ Falha ao enviar relatório.');
+            } catch (err) {
+                alert('Erro: ' + err.message);
+            } finally {
+                btnReport.disabled = false;
+                btnReport.innerHTML = '<i class="fa-solid fa-chart-bar"></i> Relatório';
+            }
+        });
+    }
 }
