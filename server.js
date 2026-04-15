@@ -289,20 +289,58 @@ app.delete('/api/comments/:id', (req, res) => {
 
 // === ROTAS DE E-MAIL ===
 app.post('/api/email/newsletter', async (req, res) => {
-    const { subject, message, recipients } = req.body;
-    if (!subject || !message || !recipients || recipients.length === 0) {
+    const { subject, message, sent_by } = req.body;
+    if (!subject || !message) {
         return res.status(400).json({ error: 'Dados incompletos.' });
     }
-    const result = await mailer.sendNewsletter(recipients, subject, message);
-    res.json(result);
+    // Busca voluntários ativos que NÃO cancelaram o e-mail
+    db.all('SELECT id, name, email FROM volunteers WHERE status = ? AND (email_opt_out IS NULL OR email_opt_out = 0)', ['Ativo'], async (err, recipients) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!recipients || recipients.length === 0) {
+            return res.json({ success: false, reason: 'Nenhum destinatário disponível.' });
+        }
+        const result = await mailer.sendNewsletter(recipients, subject, message);
+        // Registra no log de e-mails (incluindo messageIds para rastreamento futuro)
+        if (result.success) {
+            db.run(
+                'INSERT INTO email_logs (subject, recipients_count, sent_by, message_ids) VALUES (?, ?, ?, ?)',
+                [subject, result.sent, sent_by || null, JSON.stringify(result.messageIds || [])]
+            );
+        }
+        res.json(result);
+    });
+});
+
+app.get('/api/email/logs', (req, res) => {
+    const query = `
+        SELECT el.id, el.subject, el.recipients_count, el.sent_at,
+               COALESCE(v.name, 'Administrador') as sent_by_name
+        FROM email_logs el
+        LEFT JOIN volunteers v ON el.sent_by = v.id
+        ORDER BY el.sent_at DESC
+    `;
+    db.all(query, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
 });
 
 app.post('/api/email/weekly-report', (req, res) => {
     db.all('SELECT * FROM volunteers', (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         mailer.sendWeeklyReport(rows);
-        res.json({ success: true, message: 'Relatório sendo enviado...' });
+        res.json({ success: true, message: 'Relatório sendo enviado para ' + (rows.length) + ' voluntários...' });
     });
+});
+
+app.get('/api/email/stats', async (req, res) => {
+    try {
+        const stats = await mailer.fetchWeeklyStats();
+        if (!stats) return res.json({ available: false, reason: 'API key não configurada ou indisponível.' });
+        res.json({ available: true, ...stats });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // === ROTAS DE AUDITORIA DE ACESSO ===

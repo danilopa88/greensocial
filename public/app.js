@@ -924,7 +924,7 @@ function initNewsletterEvents() {
                 const res = await fetch(`${API_BASE}/email/newsletter`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ subject, message, recipients: activeVols })
+                    body: JSON.stringify({ subject, message, sent_by: currentUserId })
                 });
                 const data = await res.json();
                 feedback.style.display = 'block';
