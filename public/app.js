@@ -77,11 +77,11 @@ function initClickOutside() {
 
 async function loadInitialData() {
     try {
-        const volsRes = await fetch(`${API_BASE}/volunteers`);
+        const volsRes = await fetch(`${API_BASE}/volunteers?t=${Date.now()}`);
         if (volsRes.ok) volunteers = await volsRes.json();
 
-        // Passamos o ID do usuário logado para saber o que ele curtiu
-        const userIdParam = currentUserId ? `?user_id=${currentUserId}` : '';
+        // Adicionando um Timestamp para evitar que resultados defasados caiam no Cache do navegador
+        const userIdParam = currentUserId ? `?user_id=${currentUserId}&t=${Date.now()}` : `?t=${Date.now()}`;
         const postsRes = await fetch(`${API_BASE}/posts${userIdParam}`);
         if (postsRes.ok) posts = await postsRes.json();
 
