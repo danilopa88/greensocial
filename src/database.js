@@ -22,7 +22,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 avatar_url TEXT,
                 phone TEXT,
                 birth_date TEXT,
-                email_opt_out INTEGER DEFAULT 0
+                email_opt_out INTEGER DEFAULT 0,
+                role TEXT DEFAULT 'VOLUNTARIO',
+                identity_verified INTEGER DEFAULT 0
             )`, () => {
                 // Migração garantida para bancos existentes
                 db.all("PRAGMA table_info(volunteers)", (err, columns) => {
@@ -31,9 +33,33 @@ const db = new sqlite3.Database(dbPath, (err) => {
                         if (!columns.some(c => c.name === 'phone')) db.run('ALTER TABLE volunteers ADD COLUMN phone TEXT');
                         if (!columns.some(c => c.name === 'birth_date')) db.run('ALTER TABLE volunteers ADD COLUMN birth_date TEXT');
                         if (!columns.some(c => c.name === 'email_opt_out')) db.run('ALTER TABLE volunteers ADD COLUMN email_opt_out INTEGER DEFAULT 0');
+                        if (!columns.some(c => c.name === 'role')) db.run("ALTER TABLE volunteers ADD COLUMN role TEXT DEFAULT 'VOLUNTARIO'");
+                        if (!columns.some(c => c.name === 'identity_verified')) db.run('ALTER TABLE volunteers ADD COLUMN identity_verified INTEGER DEFAULT 0');
                     }
                 });
             });
+
+            // Fila de Denúncias
+            db.run(`CREATE TABLE IF NOT EXISTS content_reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                reporter_id INTEGER NOT NULL,
+                target_type TEXT NOT NULL, -- 'POST' ou 'COMMENT'
+                target_id INTEGER NOT NULL,
+                reason TEXT NOT NULL,
+                status TEXT DEFAULT 'PENDING', -- 'PENDING' ou 'RESOLVED'
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (reporter_id) REFERENCES volunteers(id) ON DELETE CASCADE
+            )`);
+
+            // Histórico de Edições de Conteúdo
+            db.run(`CREATE TABLE IF NOT EXISTS content_edits_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                table_name TEXT NOT NULL,
+                record_id INTEGER NOT NULL,
+                old_content TEXT NOT NULL,
+                new_content TEXT NOT NULL,
+                edited_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`);
 
             // Posts (Agora ligada ao ID do autor)
             db.run(`CREATE TABLE IF NOT EXISTS posts (

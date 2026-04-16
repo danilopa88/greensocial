@@ -45,9 +45,10 @@
                 <h2><i class="fa-solid fa-leaf"></i> Greensocial</h2>
             </div>
             <ul class="nav-links">
-                <li><a href="#" data-target="feed" class="active"><i class="fa-solid fa-rss"></i> Feed Social</a></li>
-                <li><a href="#" data-target="admin"><i class="fa-solid fa-users-gear"></i> Gestão Admin</a></li>
-                <li><a href="#" data-target="profile"><i class="fa-solid fa-user"></i> Meu Perfil</a></li>
+                <li id="nav-item-feed"><a href="#" data-target="feed" class="active"><i class="fa-solid fa-house"></i> Feed</a></li>
+                <li id="nav-item-admin" style="display: none;"><a href="#" data-target="admin"><i class="fa-solid fa-users-gear"></i> Gestão de Equipe</a></li>
+                <li id="nav-item-dashboard" style="display: none;"><a href="#" data-target="dashboard"><i class="fa-solid fa-shield-halved"></i> Moderação & Analytics</a></li>
+                <li id="nav-item-profile"><a href="#" data-target="profile"><i class="fa-solid fa-user"></i> Meu Perfil</a></li>
                 <li><a href="#" data-target="messages"><i class="fa-solid fa-comments"></i> Mensagens <span id="msg-badge" class="badge inactive" style="display:none; margin-left: auto;">0</span></a></li>
             </ul>
             <div class="sidebar-footer">
@@ -99,7 +100,54 @@
                 </div>
             </section>
 
-            <!-- View: Gestão Admin -->
+            <!-- View: Dashboard de Moderação & Analytics -->
+            <section id="view-dashboard" class="view-section">
+                <header class="section-header">
+                    <h1>Centro de Comando (Analytics)</h1>
+                    <p>Métricas em tempo real, Moderação (Fila de Denúncias) e Segurança do Sistema.</p>
+                </header>
+                
+                <div class="analytics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <div class="stat-card" style="background:#fff; padding:1.5rem; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0;">
+                        <h3 style="color:#64748b; font-size:0.9rem; margin:0 0 0.5rem 0;">Usuários Ativos</h3>
+                        <p id="stat-users" style="font-size:2rem; font-weight:700; color:#1e293b; margin:0;">0</p>
+                    </div>
+                    <div class="stat-card" style="background:#fff; padding:1.5rem; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0;">
+                        <h3 style="color:#64748b; font-size:0.9rem; margin:0 0 0.5rem 0;">Volume de Posts (Rede)</h3>
+                        <p id="stat-posts" style="font-size:2rem; font-weight:700; color:#10b981; margin:0;">0</p>
+                    </div>
+                    <div class="stat-card" style="background:#fff; padding:1.5rem; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0;">
+                        <h3 style="color:#ef4444; font-size:0.9rem; margin:0 0 0.5rem 0;"><i class="fa-solid fa-ban"></i> Contas Banidas</h3>
+                        <p id="stat-bans" style="font-size:2rem; font-weight:700; color:#ef4444; margin:0;">0</p>
+                    </div>
+                    <div class="stat-card" style="background:#fff; padding:1.5rem; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0;">
+                        <h3 style="color:#f59e0b; font-size:0.9rem; margin:0 0 0.5rem 0;"><i class="fa-solid fa-robot"></i> Repressão de Bots</h3>
+                        <p id="stat-bots" style="font-size:2rem; font-weight:700; color:#f59e0b; margin:0;">0</p>
+                    </div>
+                </div>
+
+                <header class="section-header" style="margin-top: 2rem;">
+                    <h2>Fila de Moderação (Denúncias e AutoFiltro)</h2>
+                </header>
+                <div class="table-container">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>Denunciado (Autor)</th>
+                                <th>Conteúdo Visado</th>
+                                <th>Denunciante / Motivo</th>
+                                <th>Data Reporte</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reports-table-body">
+                            <!-- Denúncias via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- View: Gestão Admin (Usuários) -->
             <section id="view-admin" class="view-section">
                 <header class="section-header flex-header">
                     <div>
@@ -114,17 +162,20 @@
                     </div>
                 </header>
 
+                <div class="search-bar-container" style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem; width: 100%;">
+                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; margin: 0.8rem 0 0 1rem; color: #94a3b8;"></i>
+                    <input type="text" id="admin-search-input" placeholder="Buscar voluntário por nome ou email..." style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.8rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.95rem; outline: none; background: #fff;">
+                </div>
+
                 <div class="table-container">
                     <table class="premium-table">
                         <thead>
                             <tr>
-                                <th>Nome Completo</th>
-                                <th>Email</th>
-                                <th>Telefone</th>
-                                <th>Data de Nasc.</th>
-                                <th>Habilidades</th>
-                                <th>Status</th>
-                                <th>Ações</th>
+                                <th>Voluntário</th>
+                                <th>Permissão (RBAC)</th>
+                                <th>Telefone / Nasc.</th>
+                                <th>Status da Conta</th>
+                                <th>Segurança</th>
                             </tr>
                         </thead>
                         <tbody id="volunteers-table-body">
@@ -197,7 +248,7 @@
                     </div>
                     <div class="chat-main" id="chat-window">
                         <div class="chat-placeholder" id="chat-placeholder">
-                            <i class="fa-solid fa-paper-plane" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <i class="fa-solid fa-leaf" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                             <p>Selecione uma conversa ao lado para começar.</p>
                         </div>
                         
@@ -214,7 +265,7 @@
 
                         <div class="chat-input-area" id="chat-input-area" style="display: none;">
                             <input type="text" id="chat-message-input" placeholder="Digite sua mensagem...">
-                            <button id="btn-send-message" class="btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+                            <button id="btn-send-message" class="btn-primary"><i class="fa-solid fa-leaf"></i></button>
                         </div>
                     </div>
                 </div>

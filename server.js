@@ -155,13 +155,83 @@ app.delete('/api/volunteers/:id', (req, res) => {
     });
 });
 
+// === MÓDULO DE ADMINISTRAÇÕES & MODERAÇÃO ===
+app.get('/api/reports', (req, res) => {
+    const query = `
+        SELECT r.*, v.name as reporter_name,
+               COALESCE(p.content, c.text, m.content) AS target_content,
+               COALESCE(p.author_id, c.author_id, m.sender_id) AS target_author_id,
+               target_vol.name AS target_author_name
+        FROM content_reports r 
+        LEFT JOIN volunteers v ON r.reporter_id = v.id 
+        LEFT JOIN posts p ON r.target_type = 'POST' AND r.target_id = p.id
+        LEFT JOIN comments c ON r.target_type = 'COMMENT' AND r.target_id = c.id
+        LEFT JOIN messages m ON r.target_type = 'MESSAGE' AND r.target_id = m.id
+        LEFT JOIN volunteers target_vol ON target_vol.id = COALESCE(p.author_id, c.author_id, m.sender_id)
+        ORDER BY r.status ASC, r.created_at DESC
+    `;
+    db.all(query, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+app.post('/api/reports', (req, res) => {
+    const { reporter_id, target_type, target_id, reason } = req.body;
+    db.run('INSERT INTO content_reports (reporter_id, target_type, target_id, reason) VALUES (?, ?, ?, ?)', [reporter_id, target_type, target_id, reason], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+app.put('/api/reports/:id/resolve', (req, res) => {
+    db.run("UPDATE content_reports SET status = 'RESOLVED' WHERE id = ?", [req.params.id], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+app.put('/api/volunteers/:id/status', (req, res) => {
+    const { status } = req.body; // 'Suspenso', 'Banido', 'Ativo', 'Inativo'
+    db.run("UPDATE volunteers SET status = ? WHERE id = ?", [status, req.params.id], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+app.put('/api/volunteers/:id/verify', (req, res) => {
+    const { verified } = req.body; 
+    db.run("UPDATE volunteers SET identity_verified = ? WHERE id = ?", [verified ? 1 : 0, req.params.id], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+app.get('/api/analytics', (req, res) => {
+    // Real time query stats
+    db.get('SELECT COUNT(*) as users, SUM(CASE WHEN status="Banido" THEN 1 ELSE 0 END) as bans, SUM(CASE WHEN status="Suspenso" THEN 1 ELSE 0 END) as suspensos FROM volunteers', (err, volData) => {
+        db.get('SELECT COUNT(*) as posts FROM posts', (err, postData) => {
+            db.get('SELECT COUNT(*) as reports FROM content_reports WHERE status="PENDING"', (err, repData) => {
+                res.json({
+                    users: volData ? volData.users : 0,
+                    bans: volData ? (volData.bans || 0) : 0,
+                    suspensos: volData ? (volData.suspensos || 0) : 0,
+                    posts: postData ? postData.posts : 0,
+                    pending_reports: repData ? repData.reports : 0,
+                    failed_logins: 0 // Removido comportamento aleatório de bots
+                });
+            });
+        });
+    });
+});
+
 // === ROTAS DE POSTAGENS ===
 app.get('/api/posts', (req, res) => {
     const userId = parseInt(req.query.user_id, 10) || 0;
     
     // PREVENÇÃO DE SQL INJECTION: Usando ? placeholder para o userId
     const postsQuery = `
-        SELECT p.*, COALESCE(v.name, 'Usuário Removido') as author, v.email as author_email, v.avatar_url as author_avatar,
+        SELECT p.*, COALESCE(v.name, 'Usuário Removido') as author, v.email as author_email, v.avatar_url as author_avatar, v.identity_verified as author_verified,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND volunteer_id = ?) as liked_by_me
         FROM posts p 
         LEFT JOIN volunteers v ON p.author_id = v.id 
@@ -173,7 +243,7 @@ app.get('/api/posts', (req, res) => {
         
         db.all('SELECT * FROM post_media', (err, media) => {
             const commentsQuery = `
-                SELECT c.*, COALESCE(v.name, 'Usuário Removido') as author, v.email as author_email, v.avatar_url as author_avatar 
+                SELECT c.*, COALESCE(v.name, 'Usuário Removido') as author, v.email as author_email, v.avatar_url as author_avatar, v.identity_verified as author_verified 
                 FROM comments c 
                 LEFT JOIN volunteers v ON c.author_id = v.id
             `;
@@ -198,6 +268,15 @@ app.get('/api/posts', (req, res) => {
 
 app.post('/api/posts', upload.array('media'), (req, res) => {
     const { author_id, content } = req.body;
+    
+    // Filtro Automático contra Ofensas
+    const bannedWords = ['spam', 'ofensa', 'odio', 'fraude', 'fake', 'bot', 'golpe'];
+    const isOffensive = bannedWords.some(word => (content || '').toLowerCase().includes(word));
+    if (isOffensive) {
+        db.run('INSERT INTO content_reports (reporter_id, target_type, target_id, reason) VALUES (?, ?, ?, ?)', [author_id, 'POST', 0, 'Auto-Bloqueio pelo Filtro Ofensivo']);
+        return res.status(403).json({ error: 'Conteúdo classificado como ofensivo e enviado para a moderação.' });
+    }
+
     db.run('INSERT INTO posts (author_id, content) VALUES (?, ?)', [author_id, content || ''], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         const postId = this.lastID;
@@ -217,6 +296,19 @@ app.post('/api/posts', upload.array('media'), (req, res) => {
 
 app.put('/api/posts/:id', (req, res) => {
     const { content } = req.body;
+    
+    const bannedWords = ['spam', 'ofensa', 'odio', 'fraude', 'fake', 'bot', 'golpe'];
+    if (bannedWords.some(word => (content || '').toLowerCase().includes(word))) {
+        return res.status(403).json({ error: 'Edição recusada pelo filtro ofensivo.' });
+    }
+
+    // Auditoria de edição
+    db.get('SELECT content FROM posts WHERE id=?', [req.params.id], (err, row) => {
+        if(row) {
+            db.run('INSERT INTO content_edits_audit (table_name, record_id, old_content, new_content) VALUES (?, ?, ?, ?)', ['posts', req.params.id, row.content, content]);
+        }
+    });
+
     db.run('UPDATE posts SET content=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', [content, req.params.id], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });

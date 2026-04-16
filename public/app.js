@@ -51,7 +51,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     initAccessLogEvents();
     initNewsletterEvents();
     initChat();
+    initAdminSearch();
 });
+
+function initAdminSearch() {
+    const searchInput = document.getElementById("admin-search-input");
+    if (!searchInput) return;
+    searchInput.addEventListener("input", (e) => {
+        const searchTerm = e.target.value.trim().toLowerCase();
+        renderVolunteers(searchTerm);
+    });
+}
 
 function initAccessLogEvents() {
     window.addEventListener('beforeunload', () => {
@@ -135,12 +145,18 @@ function initAuthFlow() {
         const existingVol = volunteers.find(v => v.email.toLowerCase() === emailInput);
         if (existingVol) {
             if (existingVol.status === "Inativo") {
-                loginError.innerText = "Sua conta está inativa. Entre em contato com o administrador.";
+                loginError.innerText = "Sua conta está inativa. Entre em contato.";
+                loginError.style.display = "block";
+                return;
+            }
+            if (existingVol.status === "Banido" || existingVol.status === "Suspenso") {
+                loginError.innerText = `Acesso Bloqueado. Sua conta encontra-se no status: ${existingVol.status}.`;
                 loginError.style.display = "block";
                 return;
             }
             loginError.style.display = "none";
-            loginAs(emailInput, "VOLUNTARIO", existingVol.id);
+            // Usa existingVol.role em vez de hardcoded VOLUNTARIO
+            loginAs(emailInput, existingVol.role || "VOLUNTARIO", existingVol.id);
         } else {
             loginError.innerText = "Email não encontrado.";
             loginError.style.display = "block";
@@ -252,14 +268,25 @@ function loginAs(email, role, id) {
     }
 
     const adminTab = document.querySelector('.nav-links a[data-target="admin"]');
-    if (adminTab && adminTab.parentElement) {
+    const dashboardTab = document.querySelector('.nav-links a[data-target="dashboard"]');
+    
+    if (adminTab && dashboardTab) {
         if (role === "VOLUNTARIO") {
             adminTab.parentElement.style.display = 'none';
-            if (document.getElementById('view-admin').classList.contains('active')) {
+            dashboardTab.parentElement.style.display = 'none';
+            if (document.getElementById('view-admin').classList.contains('active') || document.getElementById('view-dashboard').classList.contains('active')) {
                 document.querySelector('.nav-links a[data-target="feed"]').click();
             }
+        } else if (role === "MODERADOR") {
+            adminTab.parentElement.style.display = 'none';
+            dashboardTab.parentElement.style.display = 'block';
+            if (document.getElementById('view-admin').classList.contains('active')) {
+                dashboardTab.click();
+            }
         } else {
+            // ADMIN master
             adminTab.parentElement.style.display = 'block';
+            dashboardTab.parentElement.style.display = 'block';
         }
     }
 
@@ -306,8 +333,70 @@ function initNavigation() {
             link.classList.add("active");
             const targetId = `view-${link.getAttribute("data-target")}`;
             document.getElementById(targetId).classList.add("active");
+
+            if (targetId === "view-dashboard") {
+                loadDashboardData();
+            }
         });
     });
+}
+
+async function loadDashboardData(isSilent = false) {
+    try {
+        const statsRes = await fetch(`${API_BASE}/analytics?t=${Date.now()}`);
+        if(statsRes.ok) {
+            const data = await statsRes.json();
+            document.getElementById('stat-users').innerText = data.users || 0;
+            document.getElementById('stat-posts').innerText = data.posts || 0;
+            document.getElementById('stat-bans').innerText = data.bans || 0;
+            const uiBots = document.getElementById('stat-bots');
+            if (uiBots) {
+                // Alterado para representar usuários suspensos
+                uiBots.parentElement.querySelector('h3').innerText = "Usuários Suspensos";
+                uiBots.innerText = data.suspensos || 0;
+            }
+        }
+
+        const repRes = await fetch(`${API_BASE}/reports?t=${Date.now()}`);
+        if(repRes.ok) {
+            const reports = await repRes.json();
+            renderReports(reports);
+        }
+    } catch (err) {
+        console.error("Erro dashboard:", err);
+    }
+}
+
+function renderReports(reports) {
+    const tbody = document.getElementById("reports-table-body");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    reports.forEach(r => {
+        let act = "";
+        if(r.status === 'PENDING') {
+            act = `<button class="btn-primary" style="padding:0.25rem 0.5rem;font-size:0.8rem;" onclick="resolveReport(${r.id})"><i class="fa-solid fa-check"></i> Resolver</button>`;
+        } else {
+            act = `<span style="color:#10b981;font-weight:bold;"><i class="fa-solid fa-check-double"></i> Resolvido</span>`;
+        }
+        
+        const targetAuthor = r.target_author_name ? `<strong>${escapeHTML(r.target_author_name)}</strong><br><span style="font-size:0.8rem;color:#64748b;">ID: ${r.target_author_id}</span>` : '<em style="color:#94a3b8;">Desconhecido/Removido</em>';
+        const targetContent = r.target_content ? `<div style="max-height: 80px; overflow-y: auto; background:#f8fafc; padding:0.5rem; border-radius:4px; font-size:0.85rem; border: 1px solid #e2e8f0;">${escapeHTML(r.target_content)}</div>` : '<em style="color:#94a3b8;">Conteúdo Removido</em>';
+        
+        tbody.insertAdjacentHTML('beforeend', `
+            <tr>
+                <td>${targetAuthor}</td>
+                <td><span class="badge" style="background:#e2e8f0;color:#475569;margin-bottom:0.4rem;">${r.target_type} ID: ${r.target_id}</span><br>${targetContent}</td>
+                <td><strong>${escapeHTML(r.reporter_name || 'Sistema IA Autofiltro')}</strong><br><span style="color:#ef4444; font-size:0.85rem">${escapeHTML(r.reason)}</span></td>
+                <td>${new Date(r.created_at).toLocaleString('pt-BR')}</td>
+                <td>${act}</td>
+            </tr>
+        `);
+    });
+}
+
+window.resolveReport = async function(id) {
+    await fetch(`${API_BASE}/reports/${id}/resolve`, { method: 'PUT' });
+    loadDashboardData();
 }
 
 function renderPosts() {
@@ -367,10 +456,11 @@ function renderPosts() {
                     <button class="btn-icon-only" style="color: #ef4444;" title="Remover" onclick="deletePost(${post.id})"><i class="fa-solid fa-trash"></i></button>
                 </div>
                 `;
-            } else if (isAdmin) {
+            } else {
                 actionsHtml = `
                 <div class="post-header-actions">
-                    <button class="btn-icon-only" style="color: #ef4444;" title="Remover por Moderação" onclick="deletePost(${post.id})"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn-icon-only" style="color: #64748b;" title="Denunciar Post" onclick="reportContent('POST', ${post.id})"><i class="fa-solid fa-flag"></i></button>
+                    ${isAdmin ? `<button class="btn-icon-only" style="color: #ef4444;" title="Remover por Moderação" onclick="deletePost(${post.id})"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div>
                 `;
             }
@@ -414,6 +504,10 @@ function renderPosts() {
                         </div>
                     </div>
                     `;
+                } else if (!isMyComment && !isEditingComment) {
+                    commentActionsHtml = `
+                        <button class="btn-icon-only-small" title="Denunciar Comentário" style="color: #64748b; margin-left: auto;" onclick="reportContent('COMMENT', ${c.id})"><i class="fa-solid fa-flag"></i></button>
+                    `;
                 }
 
                 let commentTextHtml = isEditingComment ? `
@@ -424,12 +518,14 @@ function renderPosts() {
                     </div>
                 ` : `<span class="comment-text">${escapeHTML(c.text)}</span>`;
 
+                const commentShield = c.author_verified ? '<i class="fa-solid fa-circle-check" style="color:#3b82f6; margin-left:3px;" title="Identidade Verificada"></i>' : '';
+
                 return `
                 <div class="comment-item">
                     <img src="${getAvatarUrl(c.author, c.author_avatar)}" alt="Avatar" class="avatar">
                     <div class="comment-body" style="flex:1;">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                            <span class="comment-author">${escapeHTML(c.author)}${isMyComment ? ' <span style="opacity:0.6;font-size:0.8rem">(Você)</span>' : ''}</span>
+                            <span class="comment-author">${escapeHTML(c.author)}${commentShield}${isMyComment ? ' <span style="opacity:0.6;font-size:0.8rem">(Você)</span>' : ''}</span>
                             ${commentActionsHtml}
                         </div>
                         ${commentTextHtml}
@@ -449,7 +545,8 @@ function renderPosts() {
             `;
         }
 
-        const displayAuthor = isMe ? `${escapeHTML(post.author)} <span style="opacity:0.6;font-size:0.8rem;">(Você)</span>` : escapeHTML(post.author);
+        const postShield = post.author_verified ? '<i class="fa-solid fa-circle-check" style="color:#3b82f6; margin-left:3px;" title="Identidade Verificada"></i>' : '';
+        const displayAuthor = isMe ? `${escapeHTML(post.author)}${postShield} <span style="opacity:0.6;font-size:0.8rem;">(Você)</span>` : `${escapeHTML(post.author)}${postShield}`;
 
         let displayTime = "Agora mesmo";
         if (post.created_at) {
@@ -515,8 +612,26 @@ window.toggleLike = async function (postId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: currentUserId })
     });
-    await loadInitialData();
+    // Um leve delay para garantir que o BD SQLite salvou a transação antes do GET
+    setTimeout(async () => {
+        await loadInitialData();
+    }, 100);
 };
+
+window.reportContent = async function(type, targetId) {
+    const reason = prompt("Por favor, descreva brevemente o motivo da denúncia:");
+    if (!reason || reason.trim() === "") return;
+    try {
+        await fetch(`${API_BASE}/reports`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reporter_id: currentUserId, target_type: type, target_id: targetId, reason: reason })
+        });
+        alert("Sua denúncia foi enviada com sucesso e será analisada pelos Administradores!");
+    } catch(err) {
+        console.error(err);
+    }
+}
 
 window.toggleComments = function (postId) {
     if (expandedComments.has(postId)) {
@@ -670,34 +785,91 @@ function initPostEvent() {
     });
 }
 
-function renderVolunteers() {
+function renderVolunteers(searchTerm = "") {
     const tbody = document.getElementById("volunteers-table-body");
+    if (!tbody) return;
     tbody.innerHTML = "";
-    volunteers.forEach(vol => {
+    
+    // Filtragem customizada
+    const filteredVols = volunteers.filter(vol => {
+        if (!searchTerm) return true;
+        const nameMatch = vol.name && vol.name.toLowerCase().includes(searchTerm);
+        const emailMatch = vol.email && vol.email.toLowerCase().includes(searchTerm);
+        return nameMatch || emailMatch;
+    });
+
+    filteredVols.forEach(vol => {
         const tr = document.createElement("tr");
-        const statusClass = vol.status === "Ativo" ? "active" : "inactive";
+
+        let badgeStyle = "background: #10b981; color: white;";
+        if (vol.status === "Inativo") badgeStyle = "background: #64748b; color: white;";
+        if (vol.status === "Suspenso") badgeStyle = "background: #f59e0b; color: white;";
+        if (vol.status === "Banido") badgeStyle = "background: #ef4444; color: white;";
+
         const volAvatar = getAvatarUrl(vol.name, vol.avatar_url);
-        let removeAction = currentUserRole === "ADMIN" ? `<a href="#" class="action-link" style="color: #ef4444;" onclick="deleteVolunteer(${vol.id})">Remover</a>` : "";
+        const verifiedIcon = vol.identity_verified ? '<i class="fa-solid fa-circle-check" style="color:#3b82f6; margin-left:5px;" title="Identidade Verificada"></i>' : '';
+        
+        let selectHtml = "";
+        let securityHtml = "";
+
+        if (currentUserRole === "ADMIN" || currentUserRole === "MODERADOR") {
+            securityHtml = `
+                <select class="premium-select" style="padding:0.2rem; font-size:0.8rem; margin-right:5px;" onchange="changeVolStatus(${vol.id}, this.value)">
+                    <option value="Ativo" ${vol.status === 'Ativo' ? 'selected' : ''}>Ativo</option>
+                    <option value="Inativo" ${vol.status === 'Inativo' ? 'selected' : ''}>Inativo</option>
+                    <option value="Suspenso" ${vol.status === 'Suspenso' ? 'selected' : ''}>Suspender</option>
+                    <option value="Banido" ${vol.status === 'Banido' ? 'selected' : ''}>Banir Conta</option>
+                </select>
+                <button title="Verificar Perfil" class="btn-icon-only-small" style="color:#3b82f6" onclick="verifyVol(${vol.id}, ${vol.identity_verified ? 0 : 1})">
+                    <i class="fa-solid ${vol.identity_verified ? 'fa-user-slash' : 'fa-user-check'}"></i>
+                </button>
+            `;
+            if (currentUserRole === "ADMIN") {
+                securityHtml += `<button title="Remover" class="btn-icon-only-small" style="color:#ef4444" onclick="deleteVolunteer(${vol.id})"><i class="fa-solid fa-trash"></i></button>`;
+            }
+        }
+
         tr.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <img src="${volAvatar}" style="width:32px; height:32px; border-radius:50%">
-                    <span style="font-weight: 500">${escapeHTML(vol.name)}</span>
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-weight: 500">${escapeHTML(vol.name)} ${verifiedIcon}</span>
+                        <span style="font-size:0.75rem; color:#64748b;">${escapeHTML(vol.email)}</span>
+                    </div>
                 </div>
             </td>
-            <td>${escapeHTML(vol.email)}</td>
-            <td>${escapeHTML(vol.phone || '—')}</td>
-            <td>${escapeHTML(vol.birth_date || '—')}</td>
-            <td class="skills-list">${escapeHTML(vol.skills)}</td>
-            <td><span class="badge ${statusClass}">${escapeHTML(vol.status)}</span></td>
+            <td><strong>${escapeHTML(vol.role || 'VOLUNTARIO')}</strong></td>
+            <td>${escapeHTML(vol.phone || '—')}<br><span style="font-size:0.75rem">${escapeHTML(vol.birth_date || '—')}</span></td>
+            <td><span class="badge" style="${badgeStyle}">${escapeHTML(vol.status)}</span></td>
             <td>
-                <a href="#" class="action-link" onclick="openEditVolunteerModal(${vol.id})">Editar</a>
-                <a href="#" class="action-link" style="color: #6366f1;" onclick="startChatWith(${vol.id})">Mensagem</a>
-                ${removeAction}
+                <div style="display:flex; gap:0.25rem;">
+                    <button class="btn-icon-only-small" style="color:var(--primary-color);" title="Mensagem" onclick="startChatWith(${vol.id})"><i class="fa-solid fa-comments"></i></button>
+                    ${securityHtml}
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
     });
+}
+
+window.changeVolStatus = async function(id, newStatus) {
+    if(!confirm(`Mudar status do usuário para ${newStatus}?`)) return;
+    await fetch(`${API_BASE}/volunteers/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+    });
+    await loadInitialData();
+}
+
+window.verifyVol = async function(id, verifyFlag) {
+    await fetch(`${API_BASE}/volunteers/${id}/verify`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verified: verifyFlag })
+    });
+    await loadInitialData();
 }
 
 window.openEditVolunteerModal = function (id) {
@@ -1018,10 +1190,19 @@ function initChat() {
         chatPollingInterval = setInterval(() => {
             if(currentUserId) {
                 checkUnreadMessagesBadge();
+                
+                // Polling do Chat
                 if(document.getElementById("view-messages").classList.contains("active")) {
                     loadConversations();
                     if(activeChatUserId) {
                         openChat(activeChatUserId, true); // true = silent update
+                    }
+                }
+                
+                // Polling do Dashboard (Métricas Rápido em Tempo Real)
+                if(document.getElementById("view-dashboard").classList.contains("active")) {
+                    if (currentUserRole === "ADMIN" || currentUserRole === "MODERADOR") {
+                        loadDashboardData(true); // true = silent update 
                     }
                 }
             }
@@ -1186,6 +1367,11 @@ function renderChatHistory(messages) {
                 <div class="chat-message-actions">
                     <span onclick="editChatMessage(${m.id}, '${escapedContent}')"><i class="fa-solid fa-pen-to-square"></i> Editar</span>
                     <span onclick="deleteChatMessage(${m.id})"><i class="fa-solid fa-trash"></i> Excluir</span>
+                </div>`;
+            } else {
+                actionsHtml = `
+                <div class="chat-message-actions received-actions">
+                    <span onclick="reportContent('MESSAGE', ${m.id})" style="color: #64748b;"><i class="fa-solid fa-flag"></i> Denunciar Comentário/Mensagem</span>
                 </div>`;
             }
 
