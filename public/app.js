@@ -11,6 +11,10 @@ let editingCommentId = null;
 let currentAccessId = localStorage.getItem("greensocial_current_access_id") || null;
 let cropper = null; // Instância do Cropper.js
 
+let activeChatUserId = null; // Para o Chat Privado
+let chatPollingInterval = null; // Para atualizar as mensagens automaticamente
+let activeConversations = []; // Histórico de conversas
+
 // Prevenção de XSS: Escapar caracteres especiais
 function escapeHTML(str) {
     if (!str) return "";
@@ -46,6 +50,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initClickOutside();
     initAccessLogEvents();
     initNewsletterEvents();
+    initChat();
 });
 
 function initAccessLogEvents() {
@@ -687,6 +692,7 @@ function renderVolunteers() {
             <td><span class="badge ${statusClass}">${escapeHTML(vol.status)}</span></td>
             <td>
                 <a href="#" class="action-link" onclick="openEditVolunteerModal(${vol.id})">Editar</a>
+                <a href="#" class="action-link" style="color: #6366f1;" onclick="startChatWith(${vol.id})">Mensagem</a>
                 ${removeAction}
             </td>
         `;
@@ -966,5 +972,298 @@ function initNewsletterEvents() {
                 btnReport.innerHTML = '<i class="fa-solid fa-chart-bar"></i> Relatório';
             }
         });
+    }
+}
+
+// === LÓGICA DO CHAT / MENSAGENS PRIVADAS ===
+function initChat() {
+    const btnSendMsg = document.getElementById("btn-send-message");
+    const inputMsg = document.getElementById("chat-message-input");
+    
+    // Listeners para envio de mensagem
+    if (btnSendMsg && inputMsg) {
+        btnSendMsg.addEventListener("click", sendMessage);
+        inputMsg.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+    }
+
+    const searchInput = document.getElementById("chat-search-input");
+    if(searchInput) {
+        searchInput.addEventListener("input", (e) => {
+            filterChatContacts(e.target.value);
+        });
+    }
+    
+    // Iniciar verificação em background de notificações de mensagens e atualizar conversas quando a aba for ativada
+    document.querySelectorAll(".nav-links a").forEach(link => {
+        link.addEventListener("click", (e) => {
+            const target = e.currentTarget.getAttribute("data-target");
+            if (target === "messages") {
+                loadConversations();
+                if(activeChatUserId) openChat(activeChatUserId);
+            } else {
+                // Ao sair da aba, paramos de atualizar o chat ativo intensamente
+                activeChatUserId = null;
+                document.getElementById("chat-placeholder").style.display = "flex";
+                document.getElementById("active-chat-header").style.display = "none";
+                document.getElementById("chat-history").style.display = "none";
+                document.getElementById("chat-input-area").style.display = "none";
+            }
+        });
+    });
+
+    // Iniciar polling
+    if(!chatPollingInterval) {
+        chatPollingInterval = setInterval(() => {
+            if(currentUserId) {
+                checkUnreadMessagesBadge();
+                if(document.getElementById("view-messages").classList.contains("active")) {
+                    loadConversations();
+                    if(activeChatUserId) {
+                        openChat(activeChatUserId, true); // true = silent update
+                    }
+                }
+            }
+        }, 3000);
+    }
+}
+
+async function checkUnreadMessagesBadge() {
+    try {
+        const res = await fetch(`${API_BASE}/messages/unread/${currentUserId}?t=${Date.now()}`);
+        if(res.ok) {
+            const data = await res.json();
+            const badge = document.getElementById("msg-badge");
+            if(data.unread > 0) {
+                badge.textContent = data.unread;
+                badge.style.display = "inline-block";
+            } else {
+                badge.style.display = "none";
+            }
+        }
+    } catch(err) {
+        // Ignora erros silenciosamente
+    }
+}
+
+async function loadConversations() {
+    if(!currentUserId) return;
+    try {
+        const res = await fetch(`${API_BASE}/messages/conversations/${currentUserId}?t=${Date.now()}`);
+        if(res.ok) {
+            activeConversations = await res.json();
+            const searchInput = document.getElementById("chat-search-input");
+            filterChatContacts(searchInput ? searchInput.value : "");
+        }
+    } catch(e) {
+        console.error("Erro carregando conversas:", e);
+    }
+}
+
+function filterChatContacts(query) {
+    query = (query || "").toLowerCase().trim();
+    
+    // Lista a ser renderizada
+    let results = [];
+    
+    // Primeiro colocamos as conversas ativas
+    activeConversations.forEach(c => {
+        results.push(c);
+    });
+    
+    // Em seguida, adicionamos todos os outros voluntários que não têm conversa ainda
+    volunteers.forEach(v => {
+        if (v.id === currentUserId) return; // Ignora a si mesmo
+        
+        let existing = results.find(c => c.contact_id === v.id);
+        if (!existing) {
+            results.push({
+                contact_id: v.id,
+                contact_name: v.name,
+                contact_avatar: v.avatar_url,
+                last_message: 'Iniciar conversa...',
+                unread_count: 0
+            });
+        }
+    });
+
+    // Se houver texto digitado, filtramos de verdade
+    if (query !== "") {
+        results = results.filter(r => r.contact_name.toLowerCase().includes(query));
+    }
+    
+    renderConversations(results);
+}
+
+function renderConversations(conversations) {
+    const list = document.getElementById("conversations-list");
+    if(conversations.length === 0) {
+        list.innerHTML = `<div style="padding: 1rem; color: #64748b; text-align: center;">Nenhuma conversa ainda.</div>`;
+        return;
+    }
+    
+    let html = "";
+    conversations.forEach(c => {
+        const name = escapeHTML(c.contact_name);
+        const avatar = getAvatarUrl(name, c.contact_avatar);
+        const lastMsg = escapeHTML(c.last_message || 'Nova conversa iniciada');
+        
+        let boldStyle = c.unread_count > 0 ? 'font-weight: 700; color: #1e293b;' : '';
+        let unreadBadge = c.unread_count > 0 ? `<div style="background:var(--primary-color);color:white;border-radius:10px;padding:2px 6px;font-size:0.7rem;font-weight:bold;">${c.unread_count}</div>` : '';
+        let activeClass = (activeChatUserId === c.contact_id) ? "active" : "";
+
+        html += `
+        <div class="chat-contact ${activeClass}" onclick="openChat(${c.contact_id})">
+            <img src="${avatar}" style="width:40px;height:40px;border-radius:50%;">
+            <div class="contact-info">
+                <h4>${name}</h4>
+                <p style="${boldStyle}">${lastMsg}</p>
+            </div>
+            ${unreadBadge}
+        </div>`;
+    });
+    
+    list.innerHTML = html;
+}
+
+window.startChatWith = function(userId) {
+    // Muda a aba
+    document.querySelectorAll(".nav-links a").forEach(l => l.classList.remove("active"));
+    document.querySelectorAll(".view-section").forEach(s => s.classList.remove("active"));
+    document.querySelector('.nav-links a[data-target="messages"]').classList.add("active");
+    document.getElementById("view-messages").classList.add("active");
+    
+    openChat(userId);
+}
+
+async function openChat(contactId, isSilent = false) {
+    activeChatUserId = contactId;
+    
+    // UI Update (se nao for silencioso)
+    if(!isSilent) {
+        const vol = volunteers.find(v => v.id === contactId);
+        if(!vol) return;
+        
+        document.getElementById("chat-placeholder").style.display = "none";
+        document.getElementById("active-chat-header").style.display = "flex";
+        document.getElementById("chat-history").style.display = "flex";
+        document.getElementById("chat-input-area").style.display = "flex";
+        
+        document.getElementById("active-chat-name").textContent = vol.name;
+        document.getElementById("active-chat-avatar").src = getAvatarUrl(vol.name, vol.avatar_url);
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/messages/history/${currentUserId}/${contactId}?t=${Date.now()}`);
+        if(res.ok) {
+            const history = await res.json();
+            renderChatHistory(history);
+        }
+    } catch(err) {
+        console.error("Erro carregando history:", err);
+    }
+}
+
+function renderChatHistory(messages) {
+    const historyDiv = document.getElementById("chat-history");
+    
+    // Checamos a rolagem pra saber se precisamos forçar scroll p/ baixo
+    const isScrolledToBottom = historyDiv.scrollHeight - historyDiv.clientHeight <= historyDiv.scrollTop + 20;
+
+    let html = "";
+    if(messages.length === 0) {
+        html = '<div style="text-align:center; color:#94a3b8; font-size:0.9rem; flex:1; display:flex; align-items:flex-end; justify-content:center; padding-bottom:1rem;">Diga olá...</div>';
+    } else {
+        messages.forEach(m => {
+            const isMe = m.sender_id === currentUserId;
+            const cls = isMe ? "sent" : "received";
+            
+            let actionsHtml = "";
+            if(isMe) {
+                const escapedContent = escapeHTML(m.content).replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                actionsHtml = `
+                <div class="chat-message-actions">
+                    <span onclick="editChatMessage(${m.id}, '${escapedContent}')"><i class="fa-solid fa-pen-to-square"></i> Editar</span>
+                    <span onclick="deleteChatMessage(${m.id})"><i class="fa-solid fa-trash"></i> Excluir</span>
+                </div>`;
+            }
+
+            html += `
+            <div class="chat-message-container ${cls}">
+                <div class="chat-message ${cls}">${escapeHTML(m.content)}</div>
+                ${actionsHtml}
+            </div>`;
+        });
+    }
+
+    // Só atualizamos o DOM se algo mudou pra não piscar a tela
+    if(historyDiv.innerHTML !== html) {
+        historyDiv.innerHTML = html;
+        if(isScrolledToBottom || messages.length <= 1) {
+            historyDiv.scrollTop = historyDiv.scrollHeight;
+        }
+    }
+}
+
+async function sendMessage() {
+    const input = document.getElementById("chat-message-input");
+    const content = input.value.trim();
+    if(!content || !activeChatUserId || !currentUserId) return;
+    
+    input.value = ""; // limpa rapido
+    
+    // Adiciona direto na UI para parecer imediato
+    const historyDiv = document.getElementById("chat-history");
+    historyDiv.insertAdjacentHTML('beforeend', `<div class="chat-message-container sent"><div class="chat-message sent">${escapeHTML(content)}</div></div>`);
+    historyDiv.scrollTop = historyDiv.scrollHeight;
+
+    try {
+        await fetch(`${API_BASE}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sender_id: currentUserId,
+                receiver_id: activeChatUserId,
+                content: content
+            })
+        });
+        // A API de history vai puxar logo na proxima rolagem
+    } catch(e) {
+        console.error("Erro enviando msg:", e);
+    }
+}
+
+window.deleteChatMessage = async function(id) {
+    if(!confirm("Deseja realmente excluir esta mensagem?")) return;
+    try {
+        const res = await fetch(`${API_BASE}/messages/${id}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sender_id: currentUserId })
+        });
+        if(res.ok) {
+            openChat(activeChatUserId, true); // recarrega silenciosamente
+        }
+    } catch(err) {
+        console.error("Erro deletando:", err);
+    }
+}
+
+window.editChatMessage = async function(id, oldContent) {
+    const newContent = prompt("Edite sua mensagem:", oldContent);
+    if(newContent === null || newContent.trim() === "" || newContent === oldContent) return;
+    
+    try {
+        const res = await fetch(`${API_BASE}/messages/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sender_id: currentUserId, content: newContent.trim() })
+        });
+        if(res.ok) {
+            openChat(activeChatUserId, true); // recarrega silenciosamente
+        }
+    } catch(err) {
+        console.error("Erro editando:", err);
     }
 }

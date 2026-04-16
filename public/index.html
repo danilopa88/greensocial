@@ -48,6 +48,7 @@
                 <li><a href="#" data-target="feed" class="active"><i class="fa-solid fa-rss"></i> Feed Social</a></li>
                 <li><a href="#" data-target="admin"><i class="fa-solid fa-users-gear"></i> Gestão Admin</a></li>
                 <li><a href="#" data-target="profile"><i class="fa-solid fa-user"></i> Meu Perfil</a></li>
+                <li><a href="#" data-target="messages"><i class="fa-solid fa-comments"></i> Mensagens <span id="msg-badge" class="badge inactive" style="display:none; margin-left: auto;">0</span></a></li>
             </ul>
             <div class="sidebar-footer">
                 <div class="user-info">
@@ -174,6 +175,48 @@
                             <input type="text" value="" disabled id="my-profile-skills">
                         </div>
                     </form>
+                </div>
+            </section>
+
+            <!-- View: Mensagens -->
+            <section id="view-messages" class="view-section">
+                <header class="section-header">
+                    <h1>Mensagens Privadas</h1>
+                    <p>Converse diretamente com outros voluntários.</p>
+                </header>
+                <div class="chat-container">
+                    <div class="chat-sidebar" id="conversations-sidebar">
+                        <div class="chat-search-box">
+                            <input type="text" id="chat-search-input" placeholder="Buscar voluntário...">
+                            <i class="fa-solid fa-magnifying-glass" style="position: absolute; right: 1.8rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                        </div>
+                        <div id="conversations-list">
+                            <!-- Lista de contatos -->
+                            <div style="padding: 1rem; color: #64748b; text-align: center;">Carregando contatos...</div>
+                        </div>
+                    </div>
+                    <div class="chat-main" id="chat-window">
+                        <div class="chat-placeholder" id="chat-placeholder">
+                            <i class="fa-solid fa-paper-plane" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <p>Selecione uma conversa ao lado para começar.</p>
+                        </div>
+                        
+                        <div class="chat-header" style="display: none;" id="active-chat-header">
+                            <img src="" class="avatar" id="active-chat-avatar" alt="Avatar">
+                            <div>
+                                <h3 id="active-chat-name" style="margin: 0; font-size: 1rem; font-weight: 600;">Nome</h3>
+                            </div>
+                        </div>
+
+                        <div class="chat-history" id="chat-history" style="display: none;">
+                            <!-- Mensagens dinâmicas aqui -->
+                        </div>
+
+                        <div class="chat-input-area" id="chat-input-area" style="display: none;">
+                            <input type="text" id="chat-message-input" placeholder="Digite sua mensagem...">
+                            <button id="btn-send-message" class="btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>

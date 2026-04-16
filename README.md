@@ -11,6 +11,12 @@
 - **Comentários e Curtidas**: Engajamento real entre os voluntários.
 - **Gerenciamento de Conteúdo**: Menu de opções (três pontos) para **Editar** e **Excluir** posts e comentários próprios (admins podem moderar qualquer conteúdo).
 
+### Mensagens Privadas (Chat)
+- **Comunicação Direta**: Troca de mensagens entre voluntários pela interface estilo "Web Messenger".
+- **Tempo Real**: Atualização instantânea com notificações ("badge") de mensagens não lidas.
+- **Edição e Exclusão**: Autores podem rever e deletar suas mensagens a qualquer momento.
+- **Criptografia Data-at-Rest (AES-256)**: Todas as mensagens são armazenadas no banco de forma encriptada usando uma chave mestra exclusiva, blindando as informações caso haja cópia indevida do banco de dados.
+
 ### Gestão de Voluntários (Admin)
 - **Painel CRUD completo**: Cadastrar, editar, desativar e remover membros.
 - **Campos**: Nome, e-mail, telefone, data de nascimento, habilidades e status.
@@ -48,7 +54,7 @@
 | Frontend | HTML5, CSS3 (Vanilla), JavaScript ES6+ |
 | UI Libs | FontAwesome, Cropper.js, SheetJS |
 | Backend | Node.js, Express |
-| Segurança | Helmet (CSP, XSS Headers) |
+| Segurança | Helmet (CSP, XSS Headers), AES-256-CBC (Crypto) |
 | Banco de Dados | SQLite3 |
 | Uploads | Multer (diretórios dinâmicos por ID) |
 | E-mail | Nodemailer (SMTP) + **@getbrevo/brevo API v3** |
@@ -131,6 +137,7 @@ O arquivo `greensocial.exe` será gerado na raiz do projeto. Para distribuir, co
 | `user_access` | Auditoria de login/logoff |
 | `deletion_audit` | Log de todas as exclusões |
 | `email_logs` | Histórico de comunicados enviados |
+| `messages` | Mensagens do Chat Privado (Conteúdo encriptografado) |
 
 ---
 
@@ -140,6 +147,7 @@ O arquivo `greensocial.exe` será gerado na raiz do projeto. Para distribuir, co
 - **Helmet**: define cabeçalhos HTTP de segurança.
 - **Prepared Statements**: previnem SQL Injection em 100% das queries.
 - **Escape HTML**: previne XSS em todo conteúdo renderizado no frontend.
+- **Data-at-Rest Encryption**: Mensagens de chat blindadas no banco de dados local com AES-256.
 
 ---
 
@@ -152,6 +160,7 @@ backups/          → Backups do banco
 database.sqlite   → Banco de dados local
 greensocial.exe   → Executável compilado
 email.config.json → Credenciais de e-mail (SENSÍVEL)
+greensocial.key   → Chave Mestra AES-256 (MUITO SENSÍVEL)
 ```
 
 ---

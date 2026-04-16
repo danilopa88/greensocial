@@ -29,3 +29,6 @@ Thumbs.db
 
 # Configuração de E-mail (contém chave SMTP — NUNCA versionar!)
 email.config.json
+
+# Criptografia (Chave privada do banco - NUNCA versionar!)
+greensocial.key
