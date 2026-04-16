@@ -1,7 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const dbPath = process.pkg 
+const dbPath = process.pkg
     ? path.join(path.dirname(process.execPath), 'database.sqlite')
     : path.resolve(__dirname, '..', 'database.sqlite');
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -27,14 +27,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 // Migração garantida para bancos existentes
                 db.all("PRAGMA table_info(volunteers)", (err, columns) => {
                     if (!err && columns) {
-                        if (!columns.some(c => c.name === 'avatar_url'))     db.run('ALTER TABLE volunteers ADD COLUMN avatar_url TEXT');
-                        if (!columns.some(c => c.name === 'phone'))          db.run('ALTER TABLE volunteers ADD COLUMN phone TEXT');
-                        if (!columns.some(c => c.name === 'birth_date'))     db.run('ALTER TABLE volunteers ADD COLUMN birth_date TEXT');
-                        if (!columns.some(c => c.name === 'email_opt_out'))  db.run('ALTER TABLE volunteers ADD COLUMN email_opt_out INTEGER DEFAULT 0');
+                        if (!columns.some(c => c.name === 'avatar_url')) db.run('ALTER TABLE volunteers ADD COLUMN avatar_url TEXT');
+                        if (!columns.some(c => c.name === 'phone')) db.run('ALTER TABLE volunteers ADD COLUMN phone TEXT');
+                        if (!columns.some(c => c.name === 'birth_date')) db.run('ALTER TABLE volunteers ADD COLUMN birth_date TEXT');
+                        if (!columns.some(c => c.name === 'email_opt_out')) db.run('ALTER TABLE volunteers ADD COLUMN email_opt_out INTEGER DEFAULT 0');
                     }
                 });
             });
-            
+
             // Posts (Agora ligada ao ID do autor)
             db.run(`CREATE TABLE IF NOT EXISTS posts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,12 +127,24 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 FOREIGN KEY (sent_by) REFERENCES volunteers(id) ON DELETE SET NULL
             )`);
 
+            // Mensagens Privadas (Chat)
+            db.run(`CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id INTEGER NOT NULL,
+                receiver_id INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                is_read INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (sender_id) REFERENCES volunteers(id) ON DELETE CASCADE,
+                FOREIGN KEY (receiver_id) REFERENCES volunteers(id) ON DELETE CASCADE
+            )`);
+
 
             // === MIGRAÇÃO: Mudar CASCADE para SET NULL em Posts e Comments ===
             const migrateTable = (tableName, createSql) => {
                 db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name=?`, [tableName], (err, row) => {
                     // Só migra se ainda tiver CASCADE na relação com volunteers E NÃO tiver SET NULL
-                    const needsMigration = !err && row && 
+                    const needsMigration = !err && row &&
                         row.sql.includes('author_id') &&
                         row.sql.toUpperCase().includes('ON DELETE CASCADE') &&
                         !row.sql.toUpperCase().includes('ON DELETE SET NULL');

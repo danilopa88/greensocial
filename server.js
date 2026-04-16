@@ -8,6 +8,7 @@ const fs = require('fs');
 const cron = require('node-cron');
 const { initBackupScheduler } = require('./src/backup');
 const mailer = require('./src/mailer');
+const { encrypt, decrypt } = require('./src/cryptoUtils');
 
 // Configuração de diretórios para o executável (pkg)
 const internalDir = __dirname;
@@ -284,6 +285,123 @@ app.delete('/api/comments/:id', (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true });
         });
+    });
+});
+
+// === ROTAS DE MENSAGENS PRIVADAS ===
+app.post('/api/messages', (req, res) => {
+    const { sender_id, receiver_id, content } = req.body;
+    if (!sender_id || !receiver_id || !content) {
+        return res.status(400).json({ error: 'Faltam dados obrigatórios.' });
+    }
+    
+    db.run('INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)', 
+        [sender_id, receiver_id, encrypt(content)], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, id: this.lastID });
+    });
+});
+app.put('/api/messages/:id', (req, res) => {
+    const { id } = req.params;
+    const { sender_id, content } = req.body;
+    if (!sender_id || !content) return res.status(400).json({ error: 'Faltam dados obrigatórios.' });
+    
+    db.run('UPDATE messages SET content = ? WHERE id = ? AND sender_id = ?', [encrypt(content), id, sender_id], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(403).json({ error: 'Não autorizada ou nula.' });
+        res.json({ success: true });
+    });
+});
+
+app.delete('/api/messages/:id', (req, res) => {
+    const { id } = req.params;
+    const { sender_id } = req.body;
+    if (!sender_id) return res.status(400).json({ error: 'Faltam dados obrigatórios.' });
+    
+    db.run('DELETE FROM messages WHERE id = ? AND sender_id = ?', [id, sender_id], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(403).json({ error: 'Não autorizada ou nula.' });
+        res.json({ success: true });
+    });
+});
+
+app.get('/api/messages/history/:user1/:user2', (req, res) => {
+    const { user1, user2 } = req.params;
+    const query = `
+        SELECT m.*, 
+               s.name as sender_name, s.avatar_url as sender_avatar,
+               r.name as receiver_name, r.avatar_url as receiver_avatar
+        FROM messages m
+        LEFT JOIN volunteers s ON m.sender_id = s.id
+        LEFT JOIN volunteers r ON m.receiver_id = r.id
+        WHERE (m.sender_id = ? AND m.receiver_id = ?) 
+           OR (m.sender_id = ? AND m.receiver_id = ?)
+        ORDER BY m.created_at ASC
+    `;
+    db.all(query, [user1, user2, user2, user1], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        // Criptografia Data-at-Rest: Descriptografando mensagens do SQLite pro Frontend
+        rows.forEach(r => {
+            if(r.content) r.content = decrypt(r.content);
+        });
+        
+        // Marcar mensagens recebidas por user1 do user2 como lidas
+        db.run(`UPDATE messages SET is_read = 1 WHERE receiver_id = ? AND sender_id = ? AND is_read = 0`, [user1, user2]);
+        
+        res.json(rows);
+    });
+});
+
+app.get('/api/messages/conversations/:userId', (req, res) => {
+    const { userId } = req.params;
+    
+    const query = `
+        SELECT 
+            CASE 
+                WHEN sender_id = CAST(? AS INTEGER) THEN receiver_id 
+                ELSE sender_id 
+            END as contact_id,
+            MAX(created_at) as last_message_time,
+            content as last_message,
+            SUM(CASE WHEN receiver_id = CAST(? AS INTEGER) AND is_read = 0 THEN 1 ELSE 0 END) as unread_count
+        FROM messages m
+        WHERE sender_id = CAST(? AS INTEGER) OR receiver_id = CAST(? AS INTEGER)
+        GROUP BY contact_id
+        ORDER BY last_message_time DESC
+    `;
+    db.all(query, [userId, userId, userId, userId], (err, conversations) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        // Criptografia Data-at-Rest: Descriptografando a ultima mensagem da lista de chat
+        conversations.forEach(c => {
+            if (c.last_message) c.last_message = decrypt(c.last_message);
+        });
+
+        if (conversations.length === 0) return res.json([]);
+
+        const contactIds = conversations.map(c => c.contact_id);
+        const placeholders = contactIds.map(() => '?').join(',');
+        db.all(`SELECT id, name, avatar_url FROM volunteers WHERE id IN (${placeholders})`, contactIds, (err, contacts) => {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            const result = conversations.map(c => {
+                const contactInfo = contacts.find(v => v.id === c.contact_id);
+                return {
+                    ...c,
+                    contact_name: contactInfo ? contactInfo.name : 'Usuário Removido',
+                    contact_avatar: contactInfo ? contactInfo.avatar_url : null
+                };
+            });
+            res.json(result);
+        });
+    });
+});
+
+app.get('/api/messages/unread/:userId', (req, res) => {
+    db.get('SELECT COUNT(*) as count FROM messages WHERE receiver_id = ? AND is_read = 0', [req.params.userId], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ unread: row ? row.count : 0 });
     });
 });
 
